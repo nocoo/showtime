@@ -2,42 +2,45 @@ import AppKit
 import SwiftUI
 import ShowtimeCore
 
-enum Theme {
-    static let ink = Color(red: 0.145, green: 0.192, blue: 0.149)
-    static let muted = Color(red: 0.431, green: 0.478, blue: 0.431)
-    static let accentHex = "#4A8234"
-    static let accent = Color(red: 74 / 255, green: 130 / 255, blue: 52 / 255)
-    static let sprout = Color(red: 207 / 255, green: 232 / 255, blue: 181 / 255)
-    static let line = Color.black.opacity(0.065)
-    static let surface = Color(red: 246 / 255, green: 248 / 255, blue: 244 / 255)
-}
-
 struct StudioView: View {
     @ObservedObject var model: StudioModel
-    @State private var theater = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var sidebarVisible: Bool { model.showInspector && !model.theaterMode }
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Rectangle().fill(Theme.line).frame(height: 1)
-            HStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 16) {
+                if sidebarVisible {
+                    InspectorView(model: model, effects: model.effects)
+                        .frame(width: 280)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
                 VStack(spacing: 0) {
                     canvasArea.frame(maxHeight: .infinity)
-                    if !theater {
-                        Rectangle().fill(Theme.line).frame(height: 1)
+                    if !model.theaterMode {
+                        Rectangle().fill(Theme.line).frame(height: 1).padding(.horizontal, 24)
                         StoryboardView(model: model)
                     }
                 }
-                if model.showInspector && !theater {
-                    Rectangle().fill(Theme.line).frame(width: 1)
-                    InspectorView(model: model, effects: model.effects).frame(width: 294)
-                }
+                .background(.white, in: RoundedRectangle(cornerRadius: 24))
+                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Theme.line, lineWidth: 0.75))
             }
-            Rectangle().fill(Theme.line).frame(height: 1)
+            .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 8)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: sidebarVisible)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: model.theaterMode)
             statusBar
         }
         .background(Theme.surface)
         .foregroundStyle(Theme.ink)
+        .tint(Theme.accent)
+        .toolbarBackground(Theme.surface, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
+        .toolbar {
+            ToolbarItem(placement: .navigation) { brand }.hideSharedBackground()
+            ToolbarItem(placement: .principal) { modePicker }.hideSharedBackground()
+            ToolbarItem(placement: .primaryAction) { transport }.hideSharedBackground()
+        }
         .sheet(isPresented: $model.showConnection) { ConnectionView(model: model) }
         .overlay(alignment: .top) {
             if let error = model.errorMessage {
@@ -45,119 +48,164 @@ struct StudioView: View {
                     Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
                     Text(error).font(.system(size: 14)).lineLimit(3)
                     Spacer()
-                    Button { model.errorMessage = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
-                }.padding(14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.orange.opacity(0.25)))
-                    .shadow(color: .black.opacity(0.08), radius: 14, y: 5).padding(.horizontal, 100).padding(.top, 72)
+                    Button { model.errorMessage = nil } label: { Image(systemName: "xmark") }
+                        .buttonStyle(StudioButtonStyle(treatment: .plain)).accessibilityLabel("Dismiss error")
+                }
+                .padding(14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.orange.opacity(0.25)))
+                .shadow(color: .black.opacity(0.08), radius: 14, y: 5)
+                .padding(.horizontal, 100).padding(.top, 12)
             }
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 11) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 9).fill(Theme.ink).frame(width: 31, height: 31)
-                Image(systemName: "play.rectangle.fill").font(.system(size: 18, weight: .medium)).foregroundStyle(Theme.sprout)
+    private var brand: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "play.rectangle.fill")
+                    .font(.system(size: 25, weight: .medium)).foregroundStyle(Theme.accent)
+                    .frame(width: 30, height: 30)
+                Text("showtime").font(.system(size: 20, weight: .semibold, design: .rounded)).tracking(-0.6)
+            }.allowsHitTesting(false)
+            Button {
+                if model.theaterMode { model.theaterMode = false; model.showInspector = true }
+                else { model.showInspector.toggle() }
+            } label: {
+                Image(systemName: "sidebar.left").font(.system(size: 16))
+                    .foregroundStyle(sidebarVisible ? Theme.accent : Theme.muted)
+            }.buttonStyle(StudioButtonStyle(treatment: .plain))
+                .help(sidebarVisible ? "Hide sidebar" : "Show sidebar")
+                .accessibilityLabel(sidebarVisible ? "Hide sidebar" : "Show sidebar")
+        }
+        .padding(.trailing, 12).frame(height: 38)
+        .foregroundStyle(Theme.ink)
+    }
+
+    private var modePicker: some View {
+        HStack(spacing: 8) {
+            modeButton("Studio", symbol: "rectangle.leftthird.inset.filled", selected: !model.theaterMode) {
+                model.theaterMode = false
             }
-            Text("showtime").font(.system(size: 20, weight: .semibold, design: .rounded)).tracking(-0.6)
-            Text("STUDIO").font(.system(size: 10, weight: .bold)).tracking(1.6).foregroundStyle(Theme.muted)
-                .padding(.horizontal, 7).padding(.vertical, 4).overlay(Capsule().strokeBorder(Theme.line))
-            Spacer()
-            HStack(spacing: 3) {
-                modeButton("Studio", selected: !theater) { theater = false }
-                modeButton("Theater", selected: theater) { theater = true }
-            }.padding(3).background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
-            Spacer()
-            Button(action: model.revealExport) { Image(systemName: "folder").font(.system(size: 16)).frame(width: 29, height: 29) }
-                .buttonStyle(.plain).foregroundStyle(Theme.muted).help("Show exports")
-            Button { model.playDemo(record: false) } label: {
-                Label("Rehearse", systemImage: "play").font(.system(size: 14, weight: .medium)).padding(.horizontal, 13).frame(height: 36)
-            }.buttonStyle(.plain).background(.white, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.line)).disabled(model.isBusy)
+            modeButton("Theater", symbol: "rectangle.inset.filled", selected: model.theaterMode) {
+                model.theaterMode = true
+            }
+        }
+        .labelStyle(.titleAndIcon)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .contain).accessibilityLabel("Workspace mode")
+    }
+
+    private func modeButton(_ title: String, symbol: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol).font(.system(size: 14, weight: selected ? .semibold : .medium))
+                .foregroundStyle(selected ? Theme.accent : Theme.muted)
+                .padding(.horizontal, 12).frame(height: 38)
+                .overlay(alignment: .bottom) {
+                    if selected { Capsule().fill(Theme.accent).frame(height: 2).padding(.horizontal, 12) }
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 9))
+        }.buttonStyle(.plain).accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    private var transport: some View {
+        HStack(spacing: 8) {
+            Button(action: model.revealExport) { Image(systemName: "folder") }
+                .buttonStyle(StudioButtonStyle(treatment: .plain))
+                .help("Show exports").accessibilityLabel("Show exports")
+            Button { model.playDemo(record: false) } label: { Label("Rehearse", systemImage: "play") }
+                .buttonStyle(StudioButtonStyle()).disabled(model.isBusy)
+                .help("Rehearse the storyboard · ⌘Return")
             Button {
                 if model.isPlaying { model.director.cancel() }
                 else if model.isRecording { model.toggleRecording() }
                 else { model.playDemo(record: true) }
             } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: model.isPlaying || model.isRecording ? "stop.fill" : "record.circle").font(.system(size: 14, weight: .semibold))
-                    Text(model.isPreparing ? "Preparing…" : (model.isFinishing ? "Finishing…" : (model.isPlaying || model.isRecording ? "Stop take" : "Record film"))).font(.system(size: 14, weight: .semibold))
-                }.foregroundStyle(.white).padding(.horizontal, 14).frame(height: 36)
-                    .background(model.isPlaying || model.isRecording ? Color(red: 0.82, green: 0.27, blue: 0.32) : Theme.accent, in: RoundedRectangle(cornerRadius: 8))
-            }.buttonStyle(.plain).disabled(model.isFinishing || model.isPreparing).help("Run the storyboard and export an MP4")
-        }
-        .padding(.horizontal, 28).frame(height: 68).background(.white.opacity(0.9))
+                Label(recordingTitle, systemImage: model.isPlaying || model.isRecording ? "stop.fill" : "record.circle")
+                    .fontWeight(.semibold).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                    .frame(minWidth: 82)
+            }
+            .buttonStyle(StudioButtonStyle(treatment: model.isPlaying || model.isRecording ? .recording : .accent))
+            .disabled(model.isFinishing || model.isPreparing)
+            .help("Run the storyboard and export an MP4 · ⇧⌘Return")
+        }.labelStyle(.titleAndIcon).fixedSize(horizontal: true, vertical: false)
+            .padding(.trailing, 8).frame(height: 38)
     }
 
-    private func modeButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(.system(size: 13, weight: selected ? .semibold : .medium))
-                .foregroundStyle(selected ? Theme.ink : Theme.muted).padding(.horizontal, 16).frame(height: 30)
-                .background(selected ? Color.white : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                .shadow(color: .black.opacity(selected ? 0.04 : 0), radius: 2, y: 1)
-        }.buttonStyle(.plain)
+    private var recordingTitle: String {
+        if model.isPreparing { return "Preparing…" }
+        if model.isFinishing { return "Finishing…" }
+        return model.isPlaying || model.isRecording ? "Stop take" : "Record"
     }
 
     private var canvasArea: some View {
-        GeometryReader { geometry in
-            let scale = max(0.1, min((geometry.size.width - 56) / Double(model.canvas.width), (geometry.size.height - 104) / Double(model.canvas.height)))
-            VStack(spacing: 14) {
-                HStack(spacing: 7) {
-                    RoundedRectangle(cornerRadius: 2).fill(model.isRecording ? Color.red : Theme.accent).frame(width: 6, height: 6)
-                    Text(model.isRecording ? "ON AIR" : "LIVE CANVAS").font(.system(size: 11, weight: .bold)).tracking(1.5)
-                    Spacer()
-                    Text("\(model.canvas.width) × \(model.canvas.height)").font(.system(size: 12, weight: .medium, design: .monospaced))
-                    Text("·").padding(.horizontal, 2)
-                    Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11))
-                    Text("Fit").font(.system(size: 12, weight: .medium))
-                }.foregroundStyle(Theme.muted).frame(width: Double(model.canvas.width) * scale)
-                FilmStageView(model: model, effects: model.effects)
-                    .frame(width: Double(model.canvas.width), height: Double(model.canvas.height))
-                    .scaleEffect(scale, anchor: .topLeading)
-                    .frame(width: Double(model.canvas.width) * scale, height: Double(model.canvas.height) * scale, alignment: .topLeading)
-                    .background(StageCaptureAnchor(model: model))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.black.opacity(0.065), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.065), radius: 22, x: 0, y: 10)
-                HStack(spacing: 5) {
-                    Image(systemName: "cursorarrow.motionlines").font(.system(size: 12))
-                    Text("Real interaction. A little movie magic.").font(.system(size: 12))
-                    Spacer()
-                    Text("\(Int(scale * 100))%").font(.system(size: 12, design: .monospaced))
-                }.foregroundStyle(Theme.muted.opacity(0.8)).frame(width: Double(model.canvas.width) * scale)
-            }.frame(width: geometry.size.width, height: geometry.size.height)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Live preview").font(.system(size: 23, weight: .semibold)).tracking(-0.6)
+                    Text("A real browser. Ready for its close-up.")
+                        .font(.system(size: 13)).foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 6) {
+                    Circle().fill(model.isRecording ? .red : Theme.accent).frame(width: 6, height: 6)
+                    Text(model.isRecording ? "On air" : "Live").font(.system(size: 12, weight: .medium))
+                }.foregroundStyle(model.isRecording ? .red : Theme.accent)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background((model.isRecording ? Color.red : Theme.accent).opacity(0.07), in: Capsule())
+                Label("\(model.canvas.width) × \(model.canvas.height)", systemImage: "aspectratio")
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                    .padding(.leading, 3)
+            }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 18)
+
+            GeometryReader { geometry in
+                let scale = max(0.1, min((geometry.size.width - 48) / Double(model.canvas.width),
+                                         (geometry.size.height - 42) / Double(model.canvas.height)))
+                VStack(spacing: 13) {
+                    FilmStageView(model: model, effects: model.effects)
+                        .frame(width: Double(model.canvas.width), height: Double(model.canvas.height))
+                        .scaleEffect(scale, anchor: .topLeading)
+                        .frame(width: Double(model.canvas.width) * scale, height: Double(model.canvas.height) * scale, alignment: .topLeading)
+                        .background(StageCaptureAnchor(model: model))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.line, lineWidth: 0.75))
+                    HStack(spacing: 6) {
+                        Image(systemName: "cursorarrow.motionlines").font(.system(size: 12))
+                        Text(model.isPlaying ? "Directing cue \(model.currentStep + 1)" : "Interact with the page to set the scene")
+                            .font(.system(size: 12))
+                        Spacer()
+                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11))
+                        Text("Fit · \(Int(scale * 100))%").font(.system(size: 12, design: .monospaced))
+                    }.foregroundStyle(Theme.muted).frame(width: Double(model.canvas.width) * scale)
+                }.frame(width: geometry.size.width, height: geometry.size.height)
+            }
         }
     }
 
     private var statusBar: some View {
         HStack(spacing: 7) {
             Text(AppVersion.display)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Theme.accent.opacity(0.07), in: Capsule())
+                .font(.system(size: 12, weight: .medium, design: .monospaced)).foregroundStyle(Theme.accent)
                 .help("Showtime \(AppVersion.display)")
                 .accessibilityLabel("Showtime version \(AppVersion.number)")
-            Rectangle().fill(Theme.line).frame(width: 1, height: 12).padding(.horizontal, 5)
+            Rectangle().fill(Theme.line).frame(width: 1, height: 12).padding(.horizontal, 7)
             Button { model.showConnection = true } label: {
                 HStack(spacing: 6) {
-                    Circle().fill(model.agentReady ? Color(red: 0.26, green: 0.65, blue: 0.47) : .orange).frame(width: 5, height: 5)
+                    Circle().fill(model.agentReady ? Theme.accent : .orange).frame(width: 5, height: 5)
                     Text(model.agentReady ? "Agent ready" : "Agent offline").font(.system(size: 12, weight: .medium))
                 }
             }.buttonStyle(.plain)
-            Text("/").foregroundStyle(Theme.muted.opacity(0.35)).padding(.horizontal, 7)
-            Text(model.statusText).font(.system(size: 12)).foregroundStyle(Theme.muted).lineLimit(1)
+            Text(model.statusText).font(.system(size: 12)).foregroundStyle(Theme.muted)
+                .lineLimit(1).padding(.leading, 12)
             Spacer()
             if model.isRecording || model.isFinishing || model.elapsed > 0 {
-                Circle().fill(model.isRecording ? Color.red : Theme.muted.opacity(0.5)).frame(width: 5, height: 5)
+                Image(systemName: model.isRecording ? "record.circle" : "clock").foregroundStyle(model.isRecording ? .red : Theme.muted)
                 Text(timecode(model.elapsed)).font(.system(size: 12, weight: .medium, design: .monospaced))
-                Text("·").foregroundStyle(Theme.muted)
+                Text("·").foregroundStyle(Theme.muted).padding(.horizontal, 4)
             }
-            Text("\(model.completedTakes) \(model.completedTakes == 1 ? "take" : "takes")").font(.system(size: 12)).foregroundStyle(Theme.muted)
-            if !model.showInspector || theater {
-                Button { theater = false; model.showInspector = true } label: { Image(systemName: "sidebar.right") }.buttonStyle(.plain).padding(.leading, 8).help("Show director")
-            }
-        }.padding(.horizontal, 28).frame(height: 34).background(.white.opacity(0.82))
+            Image(systemName: "film.stack").font(.system(size: 12)).foregroundStyle(Theme.muted)
+            Text("\(model.completedTakes) \(model.completedTakes == 1 ? "take" : "takes")")
+                .font(.system(size: 12)).foregroundStyle(Theme.muted)
+        }.padding(.horizontal, 24).frame(height: 34)
     }
 }
 
@@ -210,61 +258,92 @@ struct StoryboardView: View {
     @ObservedObject var model: StudioModel
     private var markers: [(index: Int, text: String)] {
         let steps = model.currentScript?.steps ?? []
-        let marks = steps.enumerated().filter { $0.element.action == .marker }.map { (index: $0.offset, text: $0.element.text ?? $0.element.label ?? "Scene") }
+        let marks = steps.enumerated().filter { $0.element.action == .marker }
+            .map { (index: $0.offset, text: $0.element.text ?? $0.element.label ?? "Scene") }
         return marks.isEmpty ? [(0, "Your first scene")] : marks
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 9) {
-                Image(systemName: "film.stack").font(.system(size: 15)).foregroundStyle(Theme.accent)
-                Text(model.scriptName).font(.system(size: 14, weight: .semibold))
-                Text("\(model.currentScript?.steps.count ?? 0) cues").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.muted)
-                    .padding(.horizontal, 6).padding(.vertical, 3).background(Theme.surface, in: Capsule())
+                Image(systemName: "film.stack").font(.system(size: 17)).foregroundStyle(Theme.accent)
+                Text("Storyboard").font(.system(size: 15, weight: .semibold))
+                Text("\(model.currentScript?.steps.count ?? 0) cues")
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                    .padding(.horizontal, 7).padding(.vertical, 4).background(Theme.surface, in: Capsule())
                 Spacer()
-                Button(action: model.importScript) {
-                    Label("Import script", systemImage: "square.and.arrow.down").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
-                }.buttonStyle(.plain).disabled(model.isBusy)
+                Button(action: model.importScript) { Label("Import script", systemImage: "square.and.arrow.down") }
+                    .buttonStyle(StudioButtonStyle(treatment: .plain)).disabled(model.isBusy)
                 Menu {
-                    Button("Load Orbit example", action: model.loadBundledScript)
-                    Button("Start manual recording", action: model.toggleRecording)
-                    Button("Open demo website") { model.navigate("showtime://demo") }
-                } label: { Image(systemName: "ellipsis").font(.system(size: 15)).frame(width: 22) }.menuStyle(.borderlessButton).fixedSize().disabled(model.isBusy)
+                    Button("Load Orbit example", systemImage: "sparkles", action: model.loadBundledScript)
+                    Button("Start manual recording", systemImage: "record.circle", action: model.toggleRecording)
+                    Button("Open demo website", systemImage: "globe") { model.navigate("showtime://demo") }
+                } label: { Image(systemName: "ellipsis").font(.system(size: 16)).frame(width: 22, height: 28) }
+                .menuStyle(.borderlessButton).fixedSize().disabled(model.isBusy)
+                .help("Storyboard actions").accessibilityLabel("Storyboard actions")
             }
-            HStack(spacing: 8) {
-                ForEach(Array(markers.enumerated()), id: \.offset) { position, marker in
-                    let end = position + 1 < markers.count ? markers[position + 1].index : (model.currentScript?.steps.count ?? 1)
-                    let active = model.currentStep >= marker.index && model.currentStep < end
-                    let finished = model.currentStep >= end
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 7) {
-                            Text(String(format: "%02d", position + 1)).font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundStyle(active ? Theme.accent : Theme.muted.opacity(0.65))
-                            Text(marker.text).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                            Spacer(minLength: 0)
-                            if finished { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.accent) }
-                        }
-                        GeometryReader { geo in
-                            let progress = finished ? 1 : (active ? Double(model.currentStep - marker.index + 1) / Double(max(1, end - marker.index)) : 0)
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Theme.accent.opacity(0.1))
-                                Capsule().fill(Theme.accent.opacity(active ? 1 : 0.45)).frame(width: geo.size.width * progress)
+            GeometryReader { geometry in
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 10) {
+                            ForEach(Array(markers.enumerated()), id: \.offset) { position, marker in
+                                scene(position: position, marker: marker)
+                                    .frame(width: max(146, (geometry.size.width - Double(markers.count - 1) * 10) / Double(markers.count)))
+                                    .id(marker.index)
                             }
-                        }.frame(height: 3)
-                    }
-                    .padding(.horizontal, 12).padding(.vertical, 12).frame(maxWidth: .infinity)
-                    .background(active ? Theme.accent.opacity(0.055) : Theme.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(active ? Theme.accent.opacity(0.2) : Theme.line, lineWidth: 0.7))
+                        }
+                    }.scrollIndicators(.hidden)
+                        .onChange(of: model.currentStep) { _, step in
+                            if let marker = markers.last(where: { $0.index <= step }) {
+                                withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(marker.index) }
+                            }
+                        }
+                }
+            }.frame(height: 70)
+            HStack(spacing: 7) {
+                Text(model.scriptName).font(.system(size: 12)).lineLimit(1)
+                Spacer()
+                if model.isPlaying {
+                    Text("Cue \(model.currentStep + 1) of \(model.currentScript?.steps.count ?? 0)")
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
+                } else {
+                    Text("⌘ ↵").font(.system(size: 12, design: .monospaced))
+                        .padding(.horizontal, 5).padding(.vertical, 2).background(Theme.surface, in: RoundedRectangle(cornerRadius: 4))
+                    Text("to rehearse").font(.system(size: 12))
+                }
+            }.foregroundStyle(Theme.muted)
+        }.padding(.horizontal, 24).padding(.top, 14).padding(.bottom, 20)
+    }
+
+    private func scene(position: Int, marker: (index: Int, text: String)) -> some View {
+        let end = position + 1 < markers.count ? markers[position + 1].index : (model.currentScript?.steps.count ?? 1)
+        let active = model.currentStep >= marker.index && model.currentStep < end
+        let finished = model.currentStep >= end
+        let progress = finished ? 1 : (active ? Double(model.currentStep - marker.index + 1) / Double(max(1, end - marker.index)) : 0)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 7) {
+                Text(String(format: "%02d", position + 1))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(active ? Theme.accent : Theme.muted)
+                Text(marker.text).font(.system(size: 13, weight: .medium)).lineLimit(1)
+                Spacer(minLength: 0)
+                if finished {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(Theme.accent)
+                } else if active {
+                    Image(systemName: "play.fill").font(.system(size: 9)).foregroundStyle(Theme.accent)
                 }
             }
-            HStack(spacing: 6) {
-                Text("THE STORYBOARD").font(.system(size: 10, weight: .bold)).tracking(1.3)
-                Text("·").padding(.horizontal, 3)
-                Text(model.isPlaying ? "Cue \(model.currentStep + 1) of \(model.currentScript?.steps.count ?? 0)" : "Every move, on purpose.").font(.system(size: 11))
-                Spacer()
-                Text("⌘ ↵").font(.system(size: 11)).padding(.horizontal, 4).padding(.vertical, 2).background(Theme.surface, in: RoundedRectangle(cornerRadius: 3))
-                Text("to rehearse").font(.system(size: 11))
-            }.foregroundStyle(Theme.muted)
-        }.padding(.horizontal, 28).padding(.vertical, 20).background(.white.opacity(0.86))
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.accent.opacity(0.10))
+                    Capsule().fill(Theme.accent.opacity(active ? 1 : 0.45)).frame(width: geometry.size.width * progress)
+                }
+            }.frame(height: 3)
+        }
+        .padding(13).frame(height: 68)
+        .background(active ? Theme.accent.opacity(0.055) : Theme.field, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(active ? Theme.accent.opacity(0.3) : Theme.line, lineWidth: 0.75))
+        .help(marker.text)
+        .accessibilityElement(children: .combine)
     }
 }

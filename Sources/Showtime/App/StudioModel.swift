@@ -94,6 +94,7 @@ final class StudioModel: ObservableObject {
     @Published var canGoForward = false
     @Published var addressEditing = false
     @Published var showInspector = true
+    @Published var theaterMode = false
     @Published var showConnection = false
     @Published var currentScript: FilmScript?
     @Published var scriptName = "Orbit · A little more momentum"
@@ -293,7 +294,10 @@ final class StudioModel: ObservableObject {
     }
 
     func studioScreenshot(to path: String, nativeOnly: Bool = false) async throws -> URL {
-        guard let content = window?.contentView, let stageView, stageView.bounds.width > 0 else { throw ShowtimeError("The studio window is not ready.") }
+        // Include AppKit's real titlebar, toolbar, and traffic lights. The web
+        // surface is composed separately because WKWebView renders out of process.
+        guard let contentView = window?.contentView, let stageView, stageView.bounds.width > 0 else { throw ShowtimeError("The studio window is not ready.") }
+        let content = contentView.superview ?? contentView
         let webImage = try await browser.snapshot()
         content.layoutSubtreeIfNeeded()
         guard let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { throw ShowtimeError("Could not capture the native studio controls.") }
@@ -316,7 +320,7 @@ final class StudioModel: ObservableObject {
         let stageFrame = stageView.convert(stageView.bounds, to: content)
         let captureFrame = content.isFlipped ? stageFrame : CGRect(x: stageFrame.minX, y: content.bounds.height - stageFrame.maxY,
                                                                   width: stageFrame.width, height: stageFrame.height)
-        context.addPath(CGPath(roundedRect: captureFrame, cornerWidth: 10, cornerHeight: 10, transform: nil)); context.clip()
+        context.addPath(CGPath(roundedRect: captureFrame, cornerWidth: 14, cornerHeight: 14, transform: nil)); context.clip()
         SceneCompositor.drawImage(frame, in: captureFrame, context: context)
         context.restoreGState()
         guard let image = context.makeImage(), let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {

@@ -226,7 +226,16 @@ final class AutomationServer {
                     model.showInspector = true
                 }
                 if let visible = object["showInspector"] as? Bool { model.showInspector = visible }
-                return .json(["inspector": model.selectedInspector, "showInspector": model.showInspector])
+                if let theater = object["theater"] as? Bool { model.theaterMode = theater }
+                return .json(["inspector": model.selectedInspector, "showInspector": model.showInspector, "theater": model.theaterMode])
+            case ("GET", "/v1/studio/window"):
+                guard let window = model.window else { throw ShowtimeError("The studio window is not ready.") }
+                return .json(StudioWindow.state(window))
+            case ("POST", "/v1/studio/window"):
+                guard !model.isBusy else { throw ShowtimeError("The director is busy. Finish the take before changing the window.") }
+                guard let window = model.window else { throw ShowtimeError("The studio window is not ready.") }
+                try StudioWindow.perform(dictionary(request.body), on: window)
+                return .json(StudioWindow.state(window))
             default:
                 if request.method == "GET", path.hasPrefix("/v1/jobs/") {
                     let id = String(path.dropFirst("/v1/jobs/".count))
@@ -260,7 +269,7 @@ final class AutomationServer {
                        "x": model.effects.pointer.point.x, "y": model.effects.pointer.point.y, "color": model.effects.pointer.color,
                        "hotspotX": model.effects.pointer.hotspot.x, "hotspotY": model.effects.pointer.hotspot.y,
                        "clickEffect": model.effects.pointer.clickEffect],
-            "studio": ["inspector": model.selectedInspector, "showInspector": model.showInspector],
+            "studio": ["inspector": model.selectedInspector, "showInspector": model.showInspector, "theater": model.theaterMode],
             "elapsed": model.elapsed, "status": model.statusText,
         ]
         if let job = model.director.currentJobID { object["job"] = job }

@@ -13,16 +13,21 @@ struct ShowtimeApp: App {
                 .frame(minWidth: 1120, minHeight: 760)
                 .background(WindowAccessor { window in
                     model.window = window
+                    StudioWindow.observe(window)
                     delegate.model = model
                     window.title = "Showtime — Your browser, directed."
-                    window.isMovableByWindowBackground = true
-                    window.backgroundColor = NSColor(white: 0.97, alpha: 1)
+                    // Keep the real AppKit titlebar and its native drag, double-click,
+                    // traffic-light, tiling, and full-screen behavior.
+                    window.titlebarSeparatorStyle = .none
+                    window.isMovableByWindowBackground = false
+                    window.backgroundColor = NSColor(Theme.surface)
                     window.acceptsMouseMovedEvents = true
                     window.tabbingMode = .disallowed
                 })
                 .task { delegate.model = model; model.start() }
         }
         .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
         .defaultSize(width: 1560, height: 1040)
         .windowResizability(.contentMinSize)
         .commands {
