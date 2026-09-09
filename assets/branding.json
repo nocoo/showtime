@@ -1,0 +1,24 @@
+{
+  "study": "showtime/2026-09-10-02",
+  "finishing": "03",
+  "masters": [
+    {
+      "path": "logo.png",
+      "role": "Canonical transparent artwork",
+      "source": "showtime-transparent-2048.png",
+      "sha256": "2e797a60a6349ee2cc62ee7c238dd41eeb7bf169af328375e090b66954400704"
+    },
+    {
+      "path": "logo-readme.png",
+      "role": "Rounded green presentation for README headers",
+      "source": "showtime-rounded-2048.png",
+      "sha256": "a618e7ed11ca0499a1e7d5416893615574eb7bfb07fab31ad6a16b83bbfbbbb6"
+    },
+    {
+      "path": "assets/app-icon-master.png",
+      "role": "Square master for native platform icon generation",
+      "source": "showtime-icon-2048.png",
+      "sha256": "dac1159f54289eb8fd6e03b81b7c95565d970023b34eefc463346e01fb8b1d23"
+    }
+  ]
+}

@@ -14,7 +14,7 @@ let package = Package(
         .executableTarget(
             name: "Showtime",
             dependencies: ["ShowtimeCore"],
-            resources: [.copy("Resources/Demo"), .copy("Resources/Scripts")],
+            resources: [.copy("Resources/Demo"), .copy("Resources/Scripts"), .process("Resources/Brand")],
             linkerSettings: [
                 .linkedFramework("SwiftUI"), .linkedFramework("WebKit"),
                 .linkedFramework("AVFoundation"), .linkedFramework("Network"),

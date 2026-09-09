@@ -61,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: StudioModel?
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        if let url = Bundle.main.url(forResource: "Showtime", withExtension: "icns"),
+           let icon = NSImage(contentsOf: url) {
+            // Rebuilt apps can retain an old Launch Services icon in the Dock.
+            NSApp.applicationIconImage = icon
+        }
         NSApp.activate(ignoringOtherApps: true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

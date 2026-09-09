@@ -62,9 +62,9 @@ struct StudioView: View {
     private var brand: some View {
         HStack(spacing: 12) {
             HStack(spacing: 10) {
-                Image(systemName: "play.rectangle.fill")
-                    .font(.system(size: 25, weight: .medium)).foregroundStyle(Theme.accent)
-                    .frame(width: 30, height: 30)
+                Image(nsImage: AppResources.brandMark)
+                    .resizable().renderingMode(.original).interpolation(.high).scaledToFit()
+                    .frame(width: 34, height: 34).accessibilityHidden(true)
                 Text("showtime").font(.system(size: 20, weight: .semibold, design: .rounded)).tracking(-0.6)
             }.allowsHitTesting(false)
             Button {

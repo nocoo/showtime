@@ -1,39 +1,91 @@
 import AppKit
+import ImageIO
 
-let folder = URL(fileURLWithPath: CommandLine.arguments[1])
+// Generate native consumers from the approved masters. The root PNGs remain
+// byte-for-byte originals; the macOS inset belongs only to the app icon.
+struct IconError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
-let ctx = CGContext(data: nil, width: 1024, height: 1024, bitsPerComponent: 8, bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-let tile = CGRect(x: 78, y: 78, width: 868, height: 868)
-let outline = CGPath(roundedRect: tile, cornerWidth: 196, cornerHeight: 196, transform: nil)
-ctx.setShadow(offset: CGSize(width: 0, height: -13), blur: 23, color: NSColor.black.withAlphaComponent(0.23).cgColor)
-ctx.setFillColor(NSColor(calibratedRed: 0.12, green: 0.19, blue: 0.13, alpha: 1).cgColor)
-ctx.addPath(outline); ctx.fillPath(); ctx.setShadow(offset: .zero, blur: 0)
-ctx.saveGState(); ctx.addPath(outline); ctx.clip()
-let gradient = CGGradient(colorsSpace: space, colors: [NSColor(calibratedRed: 0.10, green: 0.17, blue: 0.12, alpha: 1).cgColor, NSColor(calibratedRed: 0.27, green: 0.39, blue: 0.22, alpha: 1).cgColor] as CFArray, locations: [0, 1])!
-ctx.drawLinearGradient(gradient, start: CGPoint(x: 100, y: 160), end: CGPoint(x: 850, y: 1024), options: [])
-ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.04).cgColor); ctx.setLineWidth(1.5)
-for y in stride(from: 132, to: 946, by: 28) { ctx.move(to: CGPoint(x: 78, y: y)); ctx.addLine(to: CGPoint(x: 946, y: y)); ctx.strokePath() }
-ctx.restoreGState()
-let frame = CGRect(x: 248, y: 295, width: 528, height: 428)
-ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 28, color: NSColor.black.withAlphaComponent(0.16).cgColor)
-ctx.setFillColor(NSColor(calibratedRed: 207 / 255, green: 232 / 255, blue: 181 / 255, alpha: 1).cgColor)
-ctx.addPath(CGPath(roundedRect: frame, cornerWidth: 57, cornerHeight: 57, transform: nil)); ctx.fillPath()
-ctx.setShadow(offset: .zero, blur: 0)
-ctx.setStrokeColor(NSColor(calibratedRed: 0.18, green: 0.29, blue: 0.16, alpha: 0.16).cgColor); ctx.setLineWidth(3)
-ctx.move(to: CGPoint(x: 248, y: 648)); ctx.addLine(to: CGPoint(x: 776, y: 648)); ctx.strokePath()
-ctx.setFillColor(NSColor(calibratedRed: 0.18, green: 0.29, blue: 0.16, alpha: 0.16).cgColor)
-ctx.addPath(CGPath(roundedRect: CGRect(x: 289, y: 671, width: 270, height: 22), cornerWidth: 11, cornerHeight: 11, transform: nil)); ctx.fillPath()
-let play = CGMutablePath(); play.move(to: CGPoint(x: 455, y: 402)); play.addLine(to: CGPoint(x: 455, y: 572)); play.addQuadCurve(to: CGPoint(x: 475, y: 583), control: CGPoint(x: 455, y: 594)); play.addLine(to: CGPoint(x: 613, y: 503)); play.addQuadCurve(to: CGPoint(x: 613, y: 479), control: CGPoint(x: 634, y: 491)); play.addLine(to: CGPoint(x: 475, y: 391)); play.addQuadCurve(to: CGPoint(x: 455, y: 402), control: CGPoint(x: 455, y: 379)); play.closeSubpath()
-ctx.setFillColor(NSColor(calibratedRed: 0.18, green: 0.29, blue: 0.16, alpha: 1).cgColor); ctx.addPath(play); ctx.fillPath()
-let image = ctx.makeImage()!
-for size in [16,32,128,256,512] {
-    for scale in [1,2] {
-        let pixels = size * scale
-        let target = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-        target.interpolationQuality = .high
-        target.draw(image, in: CGRect(x: 0, y: 0, width: pixels, height: pixels))
-        let bitmap = NSBitmapImageRep(cgImage: target.makeImage()!)
-        let filename = "icon_\(size)x\(size)\(scale == 2 ? "@2x" : "").png"
-        try bitmap.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent(filename))
+
+func readImage(_ relativePath: String) throws -> CGImage {
+    let url = root.appendingPathComponent(relativePath)
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+          image.width == 2048, image.height == 2048 else {
+        throw IconError(message: "Expected a 2048 × 2048 master at \(url.path).")
     }
+    return image
+}
+
+func context(size: Int) throws -> CGContext {
+    guard let result = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+                                 space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+        throw IconError(message: "Could not allocate the \(size)-pixel icon canvas.")
+    }
+    result.interpolationQuality = .high
+    return result
+}
+
+func writePNG(_ image: CGImage, to url: URL) throws {
+    guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
+        throw IconError(message: "Could not encode \(url.lastPathComponent).")
+    }
+    // Keep resource timestamps stable when rebuilding the same artwork.
+    if (try? Data(contentsOf: url)) == data { return }
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try data.write(to: url, options: .atomic)
+}
+
+func resized(_ image: CGImage, to size: Int) throws -> CGImage {
+    let canvas = try context(size: size)
+    canvas.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+    guard let result = canvas.makeImage() else { throw IconError(message: "Could not resize the icon.") }
+    return result
+}
+
+func generate(in folder: URL) throws {
+    let square = try readImage("assets/app-icon-master.png")
+    let foreground = try readImage("logo.png")
+    let canvas = try context(size: 1024)
+
+    // The macOS tile occupies 824 of 1024 pixels, with transparent outer space
+    // for the Dock. Fit the entire square master inside it before rounding.
+    let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
+    let outline = CGPath(roundedRect: tile, cornerWidth: 185.4, cornerHeight: 185.4, transform: nil)
+    canvas.setShadow(offset: CGSize(width: 0, height: -12), blur: 20,
+                     color: NSColor.black.withAlphaComponent(0.18).cgColor)
+    canvas.setFillColor(NSColor.white.cgColor)
+    canvas.addPath(outline)
+    canvas.fillPath()
+    canvas.setShadow(offset: .zero, blur: 0)
+    canvas.saveGState()
+    canvas.addPath(outline)
+    canvas.clip()
+    canvas.draw(square, in: tile)
+    canvas.restoreGState()
+    guard let icon = canvas.makeImage() else { throw IconError(message: "Could not render the macOS icon.") }
+
+    for size in [16, 32, 128, 256, 512] {
+        for scale in [1, 2] {
+            let filename = "icon_\(size)x\(size)\(scale == 2 ? "@2x" : "").png"
+            try writePNG(resized(icon, to: size * scale), to: folder.appendingPathComponent(filename))
+        }
+    }
+    try writePNG(resized(foreground, to: 256),
+                 to: root.appendingPathComponent("Sources/Showtime/Resources/Brand/ShowtimeMark.png"))
+    print("Generated 10 macOS icon representations and the transparent toolbar mark.")
+}
+
+do {
+    guard CommandLine.arguments.count == 2 else {
+        throw IconError(message: "Usage: swift scripts/make_icon.swift <output.iconset>")
+    }
+    try generate(in: URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true))
+} catch {
+    FileHandle.standardError.write(Data((error.localizedDescription + "\n").utf8))
+    exit(1)
 }

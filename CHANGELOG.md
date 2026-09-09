@@ -8,6 +8,7 @@
 - Kept native traffic lights, titlebar double-click behavior, minimize, zoom, full screen, and window restoration.
 - Added an animated sidebar toggle beside the wordmark and Theater mode for a larger preview.
 - Made Rehearse and Record distinct, single-line buttons and removed the redundant Director sidebar heading.
+- Applied the approved black-and-white clapperboard identity to the toolbar and macOS app icon, with transparent and green README masters in the repository root.
 - Added agent window controls and full Studio screenshots, including the native toolbar; overlapping full-screen operations are rejected until AppKit finishes its animation.
 
 ## [1.0.0] - 2026-09-10
