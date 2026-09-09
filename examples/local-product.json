@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "Your next product launch",
+  "canvas": {"width": 1440, "height": 810, "inset": 32, "backdrop": "pearl"},
+  "recording": {"output": "../artifacts/local-product.mp4", "width": 1920, "height": 1080, "fps": 30},
+  "steps": [
+    {"action": "open", "url": "http://localhost:3000", "title": "Acme — A new chapter", "displayURL": "https://app.acme.example"},
+    {"action": "cursor", "style": "ring", "size": 30, "color": "#4A8234", "visible": false},
+    {"action": "marker", "text": "Meet your product"},
+    {"action": "caption", "text": "Make room for what matters.", "style": "title", "position": "center", "duration": 3},
+    {"action": "wait", "duration": 3.2},
+    {"action": "waitFor", "selector": "[data-demo='primary-action']", "timeout": 15, "label": "Replace data-demo selectors with your own page elements"},
+    {"action": "parallel", "steps": [
+      {"action": "move", "selector": "[data-demo='primary-action']", "duration": 1.1},
+      {"action": "zoom", "selector": "[data-demo='primary-action']", "scale": 1.5, "duration": 1.2}
+    ]},
+    {"action": "click", "selector": "[data-demo='primary-action']", "duration": 0.3},
+    {"action": "waitFor", "selector": "[data-demo='success']", "timeout": 15},
+    {"action": "assert", "script": "Boolean(document.querySelector('[data-demo=success]'))", "equals": true},
+    {"action": "wait", "duration": 1.4},
+    {"action": "zoom", "scale": 1, "duration": 1.2},
+    {"action": "cursor", "visible": false},
+    {"action": "caption", "text": "Your next chapter starts here.", "subtitle": "acme.example", "style": "title", "position": "center", "duration": 3.5},
+    {"action": "wait", "duration": 3.8}
+  ]
+}

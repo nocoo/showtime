@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+import sys
+
+# Bundled tools must never write bytecode into the signed app.
+sys.dont_write_bytecode = True
+from showtime_cli import main
+raise SystemExit(main())

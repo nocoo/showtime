@@ -1,0 +1,13 @@
+.build/
+.swiftpm/
+.DS_Store
+dist/
+artifacts/*
+!artifacts/.gitkeep
+__pycache__/
+node_modules/
+*.pyc
+.env
+.env.*
+!.env.example
+connection.json

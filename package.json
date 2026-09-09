@@ -1,0 +1,12 @@
+{
+  "name": "showtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A native macOS browser for agent-directed product demo recordings.",
+  "license": "MIT",
+  "scripts": {
+    "version:check": "python3 scripts/version.py check",
+    "version:sync": "python3 scripts/version.py sync",
+    "version:bump": "python3 scripts/version.py bump"
+  }
+}

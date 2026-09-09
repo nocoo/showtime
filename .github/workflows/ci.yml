@@ -1,0 +1,21 @@
+name: macOS build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version, core behavior, and script syntax
+        run: scripts/test.sh
+      - name: Build the native app
+        run: scripts/build.sh release

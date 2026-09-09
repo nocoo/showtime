@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "name": "A cursor for every scene",
+  "canvas": {
+    "width": 1440,
+    "height": 810,
+    "inset": 32,
+    "backdrop": "pearl"
+  },
+  "recording": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "steps": [
+    {
+      "action": "open",
+      "url": "showtime://demo",
+      "title": "Orbit — Work in your rhythm",
+      "displayURL": "https://app.orbit.so"
+    },
+    {
+      "action": "marker",
+      "text": "System arrow"
+    },
+    {
+      "action": "cursor",
+      "style": "arrow",
+      "size": 32,
+      "visible": true,
+      "color": "#4A8234"
+    },
+    {
+      "action": "caption",
+      "text": "System arrow",
+      "subtitle": "The exact cursor from your Mac.",
+      "duration": 3.2,
+      "style": "minimal"
+    },
+    {
+      "action": "move",
+      "selector": "#revenue-card",
+      "duration": 0.7
+    },
+    {
+      "action": "click",
+      "selector": "#range-quarter",
+      "duration": 0.8
+    },
+    {
+      "action": "wait",
+      "duration": 1.8
+    },
+    {
+      "action": "marker",
+      "text": "System hand"
+    },
+    {
+      "action": "cursor",
+      "style": "hand",
+      "size": 32,
+      "visible": true,
+      "color": "#4A8234"
+    },
+    {
+      "action": "caption",
+      "text": "System hand",
+      "subtitle": "A familiar gesture, at the right moment.",
+      "duration": 3.2,
+      "style": "minimal"
+    },
+    {
+      "action": "move",
+      "selector": "#revenue-card",
+      "duration": 0.7
+    },
+    {
+      "action": "click",
+      "selector": "#range-month",
+      "duration": 0.8
+    },
+    {
+      "action": "wait",
+      "duration": 1.8
+    },
+    {
+      "action": "marker",
+      "text": "Focus ring"
+    },
+    {
+      "action": "cursor",
+      "style": "ring",
+      "size": 32,
+      "visible": true,
+      "color": "#4A8234"
+    },
+    {
+      "action": "caption",
+      "text": "Focus ring",
+      "subtitle": "A gentle guide for the eye.",
+      "duration": 3.2,
+      "style": "minimal"
+    },
+    {
+      "action": "move",
+      "selector": "#revenue-card",
+      "duration": 0.7
+    },
+    {
+      "action": "click",
+      "selector": "#range-quarter",
+      "duration": 0.8
+    },
+    {
+      "action": "wait",
+      "duration": 1.8
+    },
+    {
+      "action": "marker",
+      "text": "Soft dot"
+    },
+    {
+      "action": "cursor",
+      "style": "dot",
+      "size": 32,
+      "visible": true,
+      "color": "#4A8234"
+    },
+    {
+      "action": "caption",
+      "text": "Soft dot",
+      "subtitle": "A small point of attention.",
+      "duration": 3.2,
+      "style": "minimal"
+    },
+    {
+      "action": "move",
+      "selector": "#revenue-card",
+      "duration": 0.7
+    },
+    {
+      "action": "click",
+      "selector": "#range-month",
+      "duration": 0.8
+    },
+    {
+      "action": "wait",
+      "duration": 1.8
+    },
+    {
+      "action": "marker",
+      "text": "Spotlight"
+    },
+    {
+      "action": "cursor",
+      "style": "spotlight",
+      "size": 32,
+      "visible": true,
+      "color": "#4A8234"
+    },
+    {
+      "action": "caption",
+      "text": "Spotlight",
+      "subtitle": "Give the important details a little light.",
+      "duration": 3.2,
+      "style": "minimal"
+    },
+    {
+      "action": "move",
+      "selector": "#revenue-card",
+      "duration": 0.7
+    },
+    {
+      "action": "click",
+      "selector": "#range-quarter",
+      "duration": 0.8
+    },
+    {
+      "action": "wait",
+      "duration": 1.8
+    },
+    {
+      "action": "cursor",
+      "visible": false
+    },
+    {
+      "action": "wait",
+      "duration": 0.4
+    }
+  ]
+}
