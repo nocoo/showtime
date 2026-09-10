@@ -263,8 +263,8 @@ final class Director {
             model.statusText = step.text ?? step.label ?? "Scene"
         case .assert:
             let value = try await browser.evaluate(step.script!) ?? NSNull()
-            let data = try JSONSerialization.data(withJSONObject: [value], options: [.fragmentsAllowed])
-            let actual = try JSONDecoder().decode([JSONValue].self, from: data)[0]
+            let data = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
+            let actual = try JSONDecoder().decode(JSONValue.self, from: data)
             guard actual == (step.equals ?? .bool(true)) else {
                 throw ShowtimeError("Assertion failed: \(step.script!). Expected \(step.equals?.foundation ?? true), received \(value).")
             }

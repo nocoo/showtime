@@ -13,15 +13,12 @@
     search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
     bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9 21h6"/>',
     plus:'<path d="M12 5v14M5 12h14"/>',
-    down:'<path d="m7 10 5 5 5-5"/>',
     chevrons:'<path d="m8 8 4-4 4 4m-8 8 4 4 4-4"/>',
     right:'<path d="M5 12h14m-5-5 5 5-5 5"/>',
     close:'<path d="m6 6 12 12M6 18 18 6"/>',
     check:'<path d="m5 12 4 4L19 6"/>',
     globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a16 16 0 0 1 0 18 16 16 0 0 1 0-18Z"/>',
     currency:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/>',
-    arrowup:'<path d="M7 17 17 7M7 7h10v10"/>',
-    clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/>',
     filter:'<path d="M4 7h16M7 12h10M10 17h4"/>',
     list:'<path d="M9 5h12M9 12h12M9 19h12M3 5h.01M3 12h.01M3 19h.01"/>',
@@ -32,11 +29,9 @@
     spark:'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/>',
     lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/>',
     help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1.5 1-1.5 1-1.5 3M12 17h.01"/>',
-    link:'<path d="m10 13 4-4M8 16l-2 2a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0m2 0 2-2a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0" transform="translate(1 0)"/>',
-    mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/>',
     return:'<path d="M20 5v9H4m5-5-5 5 5 5"/>',
   };
-  const icon = (name, extra = '') => `<svg class="icon ${extra}" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.box}</svg>`;
+  const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.box}</svg>`;
   const people = [['AL',''],['JK','a1'],['MR','a2'],['SK','a3'],['EW','a4']];
   const avatar = (index = 0) => `<span class="avatar ${people[index % people.length][1]}">${people[index % people.length][0]}</span>`;
   const avatars = (indexes = [0,1,2], extra = false) => `<div class="avatar-stack">${indexes.map(avatar).join('')}${extra ? '<span class="avatar a5">+2</span>' : ''}</div>`;
@@ -50,7 +45,7 @@
     {id:'community',name:'Community launch',description:'A place to share, learn, and grow together.',team:'Marketing',status:'done',progress:100,due:'Sep 09',color:'green',icon:'users',people:[2,4],tasks:[true,true,true,true,true]},
     {id:'workflow',name:'A smoother workflow',description:'More flow. Fewer things in the way.',team:'Engineering',status:'done',progress:100,due:'Sep 05',color:'blue',icon:'spark',people:[3,0],tasks:[true,true,true,true,true]},
   ];
-  const state = {page:'overview',range:'month',projects:structuredClone(initialProjects),filter:'All projects',view:'board',sortAscending:true,invites:[],readInbox:false,workspace:'Acme Studio',notifications:true,digest:false,overlay:null,selectedTeam:'Design',lastCreated:null};
+  const state = {page:'overview',range:'month',projects:initialProjects,filter:'All projects',view:'board',sortAscending:true,invites:[],readInbox:false,workspace:'Acme Studio',notifications:true,digest:false,selectedTeam:'Design',lastCreated:null};
   window.orbit = {state};
   window.__inputLog = [];
   ['pointerdown','click','input','keydown','wheel','pointermove'].forEach(kind => document.addEventListener(kind, event => {
@@ -97,7 +92,7 @@
     $('#profile-open').onclick=openProfile; $('#top-profile').onclick=openProfile; $('#help-open').onclick=openHelp;
     $('#workspace-switch').onclick=()=>navigate('settings');
   }
-  function navigate(page) { state.page=page; state.overlay=null; $('#overlay-root').innerHTML=''; history.replaceState(null,'',`#${page}`); shell(); }
+  function navigate(page) { state.page=page; closeOverlay(); history.replaceState(null,'',`#${page}`); shell(); }
   function pageHeading(eyebrow,title,description,actions='') {
     return `<div class="page-heading"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${description?`<p>${description}</p>`:''}</div><div class="heading-actions">${actions}</div></div>`;
   }
@@ -155,8 +150,8 @@
       <div class="card-footer">${icon('calendar')}${p.due}${avatars(p.people)}</div></article>`;
   }
   function filteredProjects() {
-    let projects=state.projects.filter(p=>state.filter==='All projects'||p.team===state.filter);
-    if(!state.sortAscending)projects=[...projects].reverse();return projects;
+    const projects=state.projects.filter(p=>state.filter==='All projects'||p.team===state.filter);
+    return state.sortAscending ? projects : projects.reverse();
   }
   function projects() {
     const filtered=filteredProjects();
@@ -209,12 +204,12 @@
     bindChart();
   }
   function showModal(content,className='') {
-    state.overlay='modal';$('#overlay-root').innerHTML=`<div class="modal-backdrop" id="modal-backdrop"><section class="modal ${className}" role="dialog" aria-modal="true">${content}</section></div>`;
+    $('#overlay-root').innerHTML=`<div class="modal-backdrop" id="modal-backdrop"><section class="modal ${className}" role="dialog" aria-modal="true">${content}</section></div>`;
     $('#modal-backdrop').onclick=e=>{if(e.target.id==='modal-backdrop')closeOverlay()};
     $$('[data-close-modal]').forEach(el=>el.onclick=closeOverlay);
   }
   const modalTop = symbol => `<div class="modal-top"><div class="modal-symbol">${icon(symbol)}</div><button class="icon-button" data-close-modal aria-label="Close dialog">${icon('close')}</button></div>`;
-  function closeOverlay() { state.overlay=null;$('#overlay-root').innerHTML=''; }
+  function closeOverlay() { $('#overlay-root').innerHTML=''; }
   function openNewProject(status='planned') {
     state.selectedTeam='Design';
     showModal(`${modalTop('spark')}<h2>Start something good.</h2><p class="description">Every great idea deserves a little room to grow.</p><form id="new-project-form">
@@ -235,7 +230,6 @@
   }
   function openDetail(id) {
     const p=state.projects.find(p=>p.id===id);if(!p)return;
-    state.overlay='detail';
     const taskNames=['Find the creative direction','Build the landing page','Connect the payment flow','Add a little analytics','Share it with the team'];
     $('#overlay-root').innerHTML=`<div class="drawer-backdrop" id="detail-backdrop"><section class="drawer" role="dialog" aria-modal="true" aria-labelledby="detail-title"><div class="drawer-toolbar"><span>PROJECT / ${esc(p.team).toUpperCase()}</span><button class="icon-button" id="close-detail" aria-label="Close project">${icon('close')}</button></div>
       <div class="project-icon drawer-project-icon ${p.color}">${icon(p.icon)}</div><h2 id="detail-title">${esc(p.name)}</h2><p class="drawer-description">${esc(p.description)}</p>

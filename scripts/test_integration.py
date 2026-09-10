@@ -66,6 +66,16 @@ def check_input(client: Client, output: Path):
     assert client.status()["url"] == client.status()["displayURL"]
     print("PASS Default metadata, overrides, and reset", flush=True)
 
+    for value in (True, False, 0, 1, '引号 " / \\ 🌱', [True, 1, None], {"nested": [False, 0, None]}):
+        act("assert", script=json.dumps(value, ensure_ascii=False), equals=value)
+    try:
+        act("assert", script="1", equals=True)
+    except ShowtimeError:
+        pass
+    else:
+        raise AssertionError("JSON assertions must distinguish booleans from numbers.")
+    print("PASS JSON assertions preserve scalar and nested types", flush=True)
+
     act("cursor", style="custom", size=40, color="#4A8234", visible=True,
         image=str(Path(__file__).resolve().parent.parent / "examples/cursors/diamond.png"),
         hotspotX=0.5, hotspotY=0.5)
@@ -73,7 +83,7 @@ def check_input(client: Client, output: Path):
     verify("window.orbit.state.range === 'quarter' && window.__inputLog.some(e=>e.kind==='click' && e.trusted && e.target==='range-quarter')",
            "Custom cursor and trusted page click")
     client.request("POST", "/v1/screenshot", {"output": str(output / "custom-cursor.png")})
-    act("click", selector="#new-project", duration=0.15)
+    act("click", selector='[id="new-project"]', duration=0.15)
     act("waitFor", selector="#project-name")
     act("type", selector="#project-name", text="旧名字", delay=0.01)
     act("type", selector="#project-name", text="青草项目 🌱", clear=True, delay=0.01)

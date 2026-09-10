@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Simplify capture preset menus and recording controls, derive storyboard names from the loaded script, and remove unused browser navigation observers.
+- Use standard JSON encoding and copying, remove unused Orbit icons, styles, and overlay state, and consolidate short-window layout rules.
+
 ## [1.3.4] - 2026-09-10
 
 - Replace the generic MacBook and older Pro drawing with 2026 MacBook Neo and 16-inch MacBook Pro geometry, including updated screen proportions, rounded upper screen corners, sculpted front lips, feet, and an uninterrupted 16:10 Pro screen. Remove the old lower-bezel wordmarks and use indigo for the dark Neo finish.

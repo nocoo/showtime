@@ -69,7 +69,6 @@
 .button.accent{background:#4a8234;border-color:#4a8234;color:#fff}
 .button.accent:hover{background:#3e702b}
 .button.soft{background:#e8f1e4;border-color:transparent;color:#5b8849}
-.button.full{width:100%}
 .status-pill{display:flex;align-items:center;gap:6px;border:1px solid #e5eae4;border-radius:20px;padding:6px 9px;font-size:11px;color:#899489;background:#fcfdfb}
 .status-pill i{height:4px;width:4px;border-radius:50%;background:#89a47d}
 .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-bottom:19px}
@@ -149,7 +148,6 @@
 .table-due{color:#919ba8;font-size:12px}
 .table-people .avatar{width:20px;height:20px;font-size:8px}
 .project-trailing .icon{width:13px;color:#aeb4bd}
-.projects-heading{margin-bottom:22px}
 .project-tools{display:flex;align-items:center;gap:9px;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:21px}
 .filter-tabs{display:flex;gap:4px}
 .filter-tab{font-size:12px;color:#959ca8;padding:7px 10px;border:1px solid transparent;border-radius:6px}
@@ -303,11 +301,8 @@
 .plan-price small{font-size:13px;letter-spacing:0;color:#93b088}
 .keyboard-key{display:inline-block;border:1px solid #e5e8ed;border-bottom-width:2px;border-radius:4px;padding:3px 6px;font-size:13px;color:#96a0ae;background:#fcfcfb}
 .help-line{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#8f99a8;padding:12px 0;border-bottom:1px solid #f0f2f6}
-.invite-chip{font-size:13px;padding:8px 10px;border:1px solid #e1ebde;background:#f0f7ed;border-radius:6px;color:#759f65;margin:10px 0}
-.analytics-range-label{font-size:12px;color:#a4aeba}
 .new-project-glow{animation:newGlow 2s ease}
 .muted{color:#a1aab7}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @keyframes contentIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -328,14 +323,6 @@
 .search-trigger{width:200px}
 .chart-axis{font-size:12px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
-@media(max-height:760px){.upgrade-card{display:none}
-.sidebar{padding-top:20px}
-.brand{margin-bottom:24px}
-.workspace-switch{margin-bottom:18px}
-.nav-section{margin-bottom:16px}
-.nav-item{padding-top:9px;padding-bottom:9px}
-.sidebar-profile{padding-top:11px}
-.sidebar-bottom{padding-top:0}}
 
 /* Keep the navigation and account reachable when a film uses a short viewport. */
 @media (max-height: 760px) {
@@ -344,8 +331,8 @@
   .workspace-switch { margin-bottom: 20px; }
   .nav-section { margin-bottom: 16px; }
   .nav-item { padding-top: 7px; padding-bottom: 7px; }
-  .sidebar-bottom { margin-top: auto; }
-  .sidebar-profile { margin-top: 9px; }
+  .sidebar-bottom { margin-top: auto; padding-top: 0; }
+  .sidebar-profile { margin-top: 9px; padding-top: 11px; }
   .upgrade-card { display: none; }
 }
 

@@ -141,13 +141,9 @@ enum SceneCompositor {
             context.addEllipse(in: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
             context.drawPath(using: .fillStroke)
         }
-        if effects.pointer.visible { drawPointer(effects.pointer, at: position(effects.pointer.point), context: context) }
+        if effects.pointer.visible { CursorRenderer.draw(effects.pointer, at: position(effects.pointer.point), context: context) }
         context.restoreGState()
         if let caption = effects.caption { drawCaption(caption, canvas: CGSize(width: c.width, height: c.height), context: context, time: time) }
-    }
-
-    static func drawPointer(_ pointer: PointerState, at point: CGPoint, context: CGContext) {
-        CursorRenderer.draw(pointer, at: point, context: context)
     }
 
     static func drawCaption(_ caption: CaptionState, canvas: CGSize, context: CGContext, time: Double) {
@@ -163,7 +159,7 @@ enum SceneCompositor {
         let paragraph = NSMutableParagraphStyle(); paragraph.alignment = .center; paragraph.lineSpacing = 3
         let font = NSFont.systemFont(ofSize: title ? 36 : 25, weight: .semibold)
         let text = NSAttributedString(string: caption.text, attributes: [.font: font, .foregroundColor: foreground, .paragraphStyle: paragraph, .kern: -0.6])
-        let maxWidth = min(canvas.width - 180, title ? 850 : 850)
+        let maxWidth = min(canvas.width - 180, 850)
         let textSize = text.boundingRect(with: CGSize(width: maxWidth - 64, height: 250), options: [.usesLineFragmentOrigin, .usesFontLeading]).size
         let subtitle = NSAttributedString(string: caption.subtitle, attributes: [.font: NSFont.systemFont(ofSize: 14, weight: .regular),
             .foregroundColor: minimal ? color("#717582") : color("#CBCAD7"), .paragraphStyle: paragraph])

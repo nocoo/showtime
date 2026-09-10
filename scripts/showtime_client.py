@@ -7,6 +7,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from copy import deepcopy
 from pathlib import Path
 
 
@@ -88,7 +89,7 @@ def absolute_path(path: str, base: Path | None = None) -> str:
 
 def resolve_script_paths(script: dict, base: Path | None = None) -> dict:
     """Resolve local assets relative to the script; URLs keep their browser semantics."""
-    script = json.loads(json.dumps(script))
+    script = deepcopy(script)
     if script.get("recording", {}).get("output"):
         script["recording"]["output"] = absolute_path(script["recording"]["output"], base)
     def walk(steps):

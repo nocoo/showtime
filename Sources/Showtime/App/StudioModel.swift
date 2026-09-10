@@ -95,8 +95,6 @@ final class StudioModel: ObservableObject {
     @Published var urlOverride = ""
     @Published var isLoading = false
     @Published var loadingProgress = 0.0
-    @Published var canGoBack = false
-    @Published var canGoForward = false
     @Published var addressEditing = false
     @Published var showInspector = true
     @Published var mode: StudioMode = .studio
@@ -104,7 +102,6 @@ final class StudioModel: ObservableObject {
         didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "studioAppearance") }
     }
     @Published var currentScript: FilmScript?
-    @Published var scriptName = "Current webpage"
     @Published var currentStep = -1
     @Published var isPlaying = false
     @Published var isRecording = false
@@ -136,6 +133,7 @@ final class StudioModel: ObservableObject {
 
     var displayTitle: String { titleOverride.isEmpty ? actualTitle : titleOverride }
     var displayURL: String { urlOverride.isEmpty ? actualURL : urlOverride }
+    var scriptName: String { currentScript?.name ?? "Current webpage" }
     var isBusy: Bool { isPlaying || isRecording || isFinishing || isPreparing }
     var theaterMode: Bool {
         get { mode == .theater }
@@ -286,7 +284,6 @@ final class StudioModel: ObservableObject {
         guard !isBusy else { return }
         currentScript = nil
         currentStep = -1
-        scriptName = "Current webpage"
     }
 
     func stageScript(_ script: FilmScript) throws {
@@ -298,7 +295,6 @@ final class StudioModel: ObservableObject {
         updateCanvas(nextCanvas)
         recordingSettings = nextVideo
         currentScript = script
-        scriptName = script.name
         currentStep = -1
         persistCaptureSettings()
     }

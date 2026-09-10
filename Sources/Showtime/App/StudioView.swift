@@ -130,10 +130,7 @@ struct StudioView: View {
             Button { model.playStoryboard(record: false) } label: { Label("Rehearse", systemImage: "play") }
                 .buttonStyle(StudioButtonStyle()).disabled(model.isBusy || model.currentScript == nil)
                 .help("Rehearse the storyboard · ⌘Return")
-            Button {
-                if model.isPlaying { model.director.cancel() }
-                else { model.toggleRecording() }
-            } label: {
+            Button(action: model.toggleRecording) {
                 HStack(alignment: .center, spacing: 8) {
                     Image(systemName: model.isPlaying || model.isRecording ? "stop.fill" : "record.circle")
                         .frame(width: 16, height: 16).accessibilityHidden(true)

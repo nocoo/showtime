@@ -43,12 +43,6 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] view, _ in
                 DispatchQueue.main.async { self?.owner?.loadingProgress = view.estimatedProgress }
             },
-            webView.observe(\.canGoBack, options: [.new]) { [weak self] view, _ in
-                DispatchQueue.main.async { self?.owner?.canGoBack = view.canGoBack }
-            },
-            webView.observe(\.canGoForward, options: [.new]) { [weak self] view, _ in
-                DispatchQueue.main.async { self?.owner?.canGoForward = view.canGoForward }
-            },
         ]
     }
 
@@ -169,9 +163,7 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     static func literal(_ value: String) -> String {
-        let data = try! JSONSerialization.data(withJSONObject: [value], options: [.fragmentsAllowed])
-        let string = String(decoding: data, as: UTF8.self)
-        return String(string.dropFirst().dropLast())
+        String(decoding: try! JSONEncoder().encode(value), as: UTF8.self)
     }
 
     func target(selector: String?, x: Double?, y: Double?, scroll: Bool = true) async throws -> CGPoint {

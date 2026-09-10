@@ -12,14 +12,14 @@ struct CaptureControls: View {
     @State private var customCanvas = false
     @State private var customVideo = false
 
-    private static let canvases: [(id: String, title: String, width: Int, height: Int)] = [
-        ("4k", "4K · 3840 × 2160", 3840, 2160),
-        ("fullhd", "Full HD · 1920 × 1080", 1920, 1080),
-        ("wide", "Widescreen · 1440 × 810", 1440, 810),
-        ("compact", "Compact · 1280 × 720", 1280, 720),
-        ("desktop", "Desktop · 1440 × 900", 1440, 900),
-        ("square", "Square · 1080 × 1080", 1080, 1080),
-        ("portrait", "Portrait · 900 × 1600", 900, 1600),
+    private static let canvases: [(title: String, width: Int, height: Int)] = [
+        ("4K · 3840 × 2160", 3840, 2160),
+        ("Full HD · 1920 × 1080", 1920, 1080),
+        ("Widescreen · 1440 × 810", 1440, 810),
+        ("Compact · 1280 × 720", 1280, 720),
+        ("Desktop · 1440 × 900", 1440, 900),
+        ("Square · 1080 × 1080", 1080, 1080),
+        ("Portrait · 900 × 1600", 900, 1600),
     ]
     private var videoPresets: [(edge: Int, title: String, spec: RecordingSpec)] {
         [(1280, "HD"), (1920, "Full HD"), (2560, "QHD"), (3840, "4K")].compactMap { edge, name in
@@ -28,33 +28,16 @@ struct CaptureControls: View {
             return (edge, "\(name) · \(spec.width) × \(spec.height)", spec)
         }
     }
-    private var canvasSelection: Binding<String> {
-        Binding(get: {
-            customCanvas ? "custom" : Self.canvases.first { $0.width == model.canvas.width && $0.height == model.canvas.height }?.id ?? "custom"
-        }, set: { id in
-            customCanvas = id == "custom"
-            guard let preset = Self.canvases.first(where: { $0.id == id }) else { return }
-            applyCanvas(width: preset.width, height: preset.height)
-        })
-    }
-    private var videoSelection: Binding<Int> {
-        Binding(get: {
-            customVideo ? 0 : videoPresets.first { $0.spec.width == model.recordingSettings.width && $0.spec.height == model.recordingSettings.height }?.edge ?? 0
-        }, set: { edge in
-            customVideo = edge == 0
-            guard let preset = videoPresets.first(where: { $0.edge == edge }) else { return }
-            do { try model.applyCapture(video: preset.spec) }
-            catch { model.report(error) }
-        })
-    }
 
     var body: some View {
         Group {
             if section == .canvas {
+                let selected = Self.canvases.first { $0.width == model.canvas.width && $0.height == model.canvas.height }
                 InspectorSection(title: "Canvas size", symbol: "aspectratio") {
-                    StudioMenu(title: "Canvas preset", selection: Self.canvases.first { $0.id == canvasSelection.wrappedValue }?.title ?? "Custom size",
-                               options: Self.canvases.map { preset in (preset.title, { canvasSelection.wrappedValue = preset.id }) }
-                               + [("Custom size", { canvasSelection.wrappedValue = "custom" })])
+                    StudioMenu(title: "Canvas preset", selection: customCanvas ? "Custom size" : selected?.title ?? "Custom size",
+                               options: Self.canvases.map { preset in
+                                   (preset.title, { customCanvas = false; applyCanvas(width: preset.width, height: preset.height) })
+                               } + [("Custom size", { customCanvas = true })])
                     dimensions(width: $canvasWidth, height: $canvasHeight, prefix: "Canvas") {
                         guard let width = Int(canvasWidth), let height = Int(canvasHeight) else {
                             model.report(ShowtimeError("Enter whole numbers for canvas width and height.")); return
@@ -66,10 +49,16 @@ struct CaptureControls: View {
                         .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 }
             } else {
+                let presets = videoPresets
+                let selected = presets.first { $0.spec.width == model.recordingSettings.width && $0.spec.height == model.recordingSettings.height }
                 InspectorSection(title: "Video export", symbol: "film") {
-                    StudioMenu(title: "Video resolution", selection: videoPresets.first { $0.edge == videoSelection.wrappedValue }?.title ?? "Custom resolution",
-                               options: videoPresets.map { preset in (preset.title, { videoSelection.wrappedValue = preset.edge }) }
-                               + [("Custom resolution", { videoSelection.wrappedValue = 0 })])
+                    StudioMenu(title: "Video resolution", selection: customVideo ? "Custom resolution" : selected?.title ?? "Custom resolution",
+                               options: presets.map { preset in (preset.title, {
+                                   customVideo = false
+                                   guard let current = videoPresets.first(where: { $0.edge == preset.edge }) else { return }
+                                   do { try model.applyCapture(video: current.spec) }
+                                   catch { model.report(error) }
+                               }) } + [("Custom resolution", { customVideo = true })])
                     dimensions(width: $videoWidth, height: $videoHeight, prefix: "Video") {
                         guard let width = Int(videoWidth), let height = Int(videoHeight) else {
                             model.report(ShowtimeError("Enter whole numbers for video width and height.")); return
