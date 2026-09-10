@@ -54,7 +54,7 @@ enum CheckRunner {
             ("Custom canvas output compatibility", script.testCustomCanvasAlwaysProducesCompatibleVideo),
             ("Capture settings validation", script.testVideoFittingDoesNotHideInvalidSettings),
             ("Custom output survives appearance and frame-rate edits", script.testCustomVideoSurvivesAppearanceAndFrameRateEdits),
-            ("Device frames, viewport sizing, fitting, and backward compatibility", script.testDeviceFramesKeepViewportSeparateFromCanvas),
+            ("Device proportions, Canvas-sized viewports, 4K fitting, and backward compatibility", script.testDeviceFramesScaleContentWithCanvas),
             ("Parallel track conflicts", script.testParallelTracksCannotRaceForTheSameProperty),
             ("Serialized native input", script.testNativeSideEffectsCannotRunInParallel),
             ("Independent visual tracks", script.testIndependentVisualTracksCanRunTogether),

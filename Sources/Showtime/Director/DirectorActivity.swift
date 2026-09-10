@@ -231,7 +231,7 @@ struct DirectorActivityView: View {
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
                     VStack(alignment: .leading, spacing: 5) {
                         Text(currentTitle).font(.system(size: 17, weight: .semibold)).lineLimit(1)
-                        Text(currentDetail).font(.system(size: 12)).foregroundStyle(Theme.muted).lineLimit(2)
+                        Text(currentDetail).font(.system(size: 12)).foregroundStyle(Theme.muted).lineLimit(2, reservesSpace: true)
                     }.frame(maxWidth: .infinity, alignment: .leading).contentTransition(.opacity)
                     if let tracks = state.current?.tracks, !tracks.isEmpty {
                         HStack(spacing: 6) {
@@ -247,7 +247,7 @@ struct DirectorActivityView: View {
                     Text(state.next == nil ? "AFTER THIS" : "UP NEXT").font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(Theme.muted)
                     Label(state.next?.title ?? (state.output != nil ? "Your film is ready to share" : "Your agent chooses the next move"),
                           systemImage: state.next?.symbol ?? "arrow.right")
-                        .font(.system(size: 12, weight: .medium)).lineLimit(2).foregroundStyle(Theme.ink)
+                        .font(.system(size: 12, weight: .medium)).lineLimit(2, reservesSpace: true).foregroundStyle(Theme.ink)
                 }.frame(width: 240, alignment: .leading).contentTransition(.opacity)
             }
             HStack(spacing: 12) {

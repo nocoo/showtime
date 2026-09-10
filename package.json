@@ -1,6 +1,6 @@
 {
   "name": "showtime",
-  "version": "1.3.0",
+  "version": "1.3.3",
   "private": true,
   "description": "A native macOS browser for agent-directed product demo recordings.",
   "license": "MIT",

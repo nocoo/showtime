@@ -11,7 +11,7 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
     private var observations: [NSKeyValueObservation] = []
     private(set) var ready = false
     private var navigationError: Error?
-    private var snapshotTask: Task<CGImage, Error>?
+    private var snapshotTask: (id: UUID, rect: CGRect, pixelWidth: Double, task: Task<CGImage, Error>)?
     private var faviconTask: Task<Void, Never>?
     private var faviconNavigation = UUID()
 
@@ -228,21 +228,30 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
         """) ?? [:]
     }
 
-    func snapshot() async throws -> CGImage {
-        if let snapshotTask { return try await snapshotTask.value }
+    func snapshot(pixelWidth: Double? = nil) async throws -> CGImage {
+        guard webView.bounds.width > 0, webView.bounds.height > 0, let window = webView.window else {
+            throw ShowtimeError("The browser window is not ready.")
+        }
+        let bounds = webView.bounds
+        let pixelWidth = ceil(pixelWidth ?? owner?.snapshotPixelWidth() ?? bounds.width)
+        if let pending = snapshotTask, pending.rect == bounds, pending.pixelWidth >= pixelWidth {
+            return try await pending.task.value
+        }
+        // WKSnapshotConfiguration uses points; its bitmap includes the display's backing scale.
+        let pointWidth = ceil(pixelWidth / max(1, window.backingScaleFactor))
+        let id = UUID()
         let task = Task { @MainActor () throws -> CGImage in
-            guard self.webView.bounds.width > 0, self.webView.window != nil else { throw ShowtimeError("The browser window is not ready.") }
             let config = WKSnapshotConfiguration()
-            config.rect = self.webView.bounds
-            config.snapshotWidth = NSNumber(value: self.webView.bounds.width)
+            config.rect = bounds
+            config.snapshotWidth = NSNumber(value: pointWidth)
             config.afterScreenUpdates = false
             let image = try await self.webView.takeSnapshot(configuration: config)
             var rect = CGRect(origin: .zero, size: image.size)
             guard let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { throw ShowtimeError("WebView returned an empty snapshot.") }
             return cg
         }
-        snapshotTask = task
-        defer { snapshotTask = nil }
+        snapshotTask = (id, bounds, pixelWidth, task)
+        defer { if snapshotTask?.id == id { snapshotTask = nil } }
         return try await task.value
     }
 
@@ -281,8 +290,8 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
     }
 
-    func scroll(at point: CGPoint, deltaX: Double, deltaY: Double) throws {
-        guard deltaX != 0 || deltaY != 0 else { return }
+    func scroll(at point: CGPoint, deltaX: Double, deltaY: Double, phase: CGScrollPhase? = nil) throws {
+        guard deltaX != 0 || deltaY != 0 || phase != nil else { return }
         guard webView.window != nil,
               let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
                                wheel1: Int32(-deltaY.rounded()), wheel2: Int32(-deltaX.rounded()), wheel3: 0) else {
@@ -295,6 +304,8 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
         // CGEvent's top-left origin is flipped back by the NSEvent bridge.
         cg.location = CGPoint(x: local.x, y: mainHeight - local.y)
         cg.setIntegerValueField(.eventSourceUserData, value: 0x53484F57)
+        cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase?.rawValue ?? 0))
         guard let event = NSEvent(cgEvent: cg) else { throw ShowtimeError("Could not bridge a scroll event.") }
         receiver(at: point).scrollWheel(with: event)
     }

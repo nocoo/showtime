@@ -27,8 +27,8 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 ## 功能
 
 - **真实网页交互** — 打开线上或本地开发页面，用 CSS 选择器或坐标移动、点击、双击、拖拽、滚动和输入；等待元素出现，并检查页面状态。
-- **镜头与画面** — 编排镜头缩放、移动和动态标题，组合并行动作；选择背景、调整画布留白，并单独设置画面中的浏览器标题与地址。
-- **设备框架** — 默认 None；支持三种 iPhone、三种 iPad 和正面 MacBook。网页自动使用设备视口，框架进入 Live Preview、截图和录像，Canvas 与输出尺寸保持独立。
+- **镜头与画面** — 编排镜头缩放、移动和动态标题，组合并行动作；选择背景、调整画布留白，并单独设置画面中的浏览器标题与地址。Canvas 支持最高 4K（3840 × 2160）预设及自定义尺寸。
+- **设备框架** — 默认 None；支持三种 iPhone、三种 iPad、正面 MacBook 和采用新款平直机身的 16 英寸 MacBook Pro。所有设备支持 Light 银色／Dark 深空黑。Frame 定义屏幕比例与外观，网页按 Canvas 中的屏幕区域布局；按 Export 分辨率采样网页并绘制外框，支持高清 4K 输出。
 - **演示光标** — 使用 macOS 箭头与手型、圆环、圆点、聚光灯或自定义 PNG，调整大小、颜色、热点和点击效果。
 - **可重复剧本** — 用 JSON 保存动作顺序，先排练，再录制。任务返回进度和每一步的结果，支持异步执行与中途停止。
 - **录制与截图** — 导出 H.264 MP4 或合成画面的 PNG；支持 24、30、60 fps，默认 1920 × 1080 / 30 fps。中止录制会保存可播放的已录部分。
@@ -36,7 +36,7 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/nocoo/showtime/releases/latest) 下载通用 App，解压后将 `Showtime.app` 拖入 Applications。支持 macOS 14+ 的 Apple Silicon 与 Intel Mac，运行界面无需 Xcode 或源码。
+从 [GitHub Releases](https://github.com/nocoo/showtime/releases/latest) 下载通用 DMG，打开后将 `Showtime.app` 拖入 Applications；也提供 ZIP 压缩包。支持 macOS 14+ 的 Apple Silicon 与 Intel Mac，运行界面无需 Xcode 或源码。
 
 当前版本使用 ad-hoc 签名，尚未经过 Apple 公证。首次打开如被 macOS 拦截，尝试打开 App 后，在「系统设置 → 隐私与安全 → 仍要打开」确认；也可以在终端执行：
 

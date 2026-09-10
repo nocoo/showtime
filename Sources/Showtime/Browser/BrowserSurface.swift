@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 
 struct WebSurfaceView: NSViewRepresentable {
@@ -34,14 +35,13 @@ final class BrowserSurface: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func layout() {
         super.layout()
-        engine.webView.frame = bounds
-        camera.frame = bounds
+        if engine.webView.frame != bounds { engine.webView.frame = bounds }
+        if camera.frame != bounds { camera.frame = bounds }
+        camera.update()
     }
 
     func updateCamera(image: CGImage? = nil) {
-        if let image { camera.image = image }
-        camera.isHidden = camera.effects.camera.scale <= 1.001
-        camera.needsDisplay = true
+        camera.update(image: image)
     }
 }
 
@@ -49,26 +49,37 @@ final class BrowserSurface: NSView {
 final class CameraSurface: NSView {
     weak var engine: BrowserEngine?
     let effects: EffectsState
-    var image: CGImage?
+    private let imageLayer = CALayer()
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
 
     init(engine: BrowserEngine, effects: EffectsState) {
         self.engine = engine; self.effects = effects
         super.init(frame: .zero)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        layer?.isGeometryFlipped = true
+        imageLayer.anchorPoint = .zero
+        imageLayer.contentsGravity = .resize
+        imageLayer.minificationFilter = .trilinear
+        imageLayer.magnificationFilter = .linear
+        layer?.addSublayer(imageLayer)
         isHidden = true
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    override func draw(_ dirtyRect: NSRect) {
-        guard let image, let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ctx.saveGState()
-        ctx.clip(to: bounds)
+    func update(image: CGImage? = nil) {
+        // Animate the layer transform instead of redrawing a 4K bitmap on every tick.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if let image { imageLayer.contents = image }
         let c = effects.camera
-        ctx.translateBy(x: c.focus.x * (1 - c.scale), y: c.focus.y * (1 - c.scale))
-        ctx.scaleBy(x: c.scale, y: c.scale)
-        SceneCompositor.drawImage(image, in: bounds, context: ctx)
-        ctx.restoreGState()
+        imageLayer.bounds = CGRect(origin: .zero, size: bounds.size)
+        imageLayer.position = .zero
+        imageLayer.setAffineTransform(CGAffineTransform(a: c.scale, b: 0, c: 0, d: c.scale,
+                                                       tx: c.focus.x * (1 - c.scale), ty: c.focus.y * (1 - c.scale)))
+        isHidden = c.scale <= 1.001
+        CATransaction.commit()
     }
 
     private func pagePoint(_ event: NSEvent) -> CGPoint {

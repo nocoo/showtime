@@ -13,6 +13,7 @@ struct CaptureControls: View {
     @State private var customVideo = false
 
     private static let canvases: [(id: String, title: String, width: Int, height: Int)] = [
+        ("4k", "4K · 3840 × 2160", 3840, 2160),
         ("fullhd", "Full HD · 1920 × 1080", 1920, 1080),
         ("wide", "Widescreen · 1440 × 810", 1440, 810),
         ("compact", "Compact · 1280 × 720", 1280, 720),
@@ -61,7 +62,7 @@ struct CaptureControls: View {
                         customCanvas = true
                         applyCanvas(width: width, height: height)
                     }
-                    Text("The final composition size. Device frames keep their own webpage viewport; video follows the Canvas aspect ratio.")
+                    Text("The final composition size, up to 3840 × 2160. Frames fit this Canvas; Export controls the capture detail and video resolution.")
                         .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 }
             } else {

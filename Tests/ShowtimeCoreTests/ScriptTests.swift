@@ -59,8 +59,8 @@ final class ScriptTests {
     }
 
     func testCustomCanvasAlwaysProducesCompatibleVideo() throws {
-        for width in [800, 801, 1333, 2560] {
-            for height in [500, 501, 811, 1600] {
+        for width in [800, 801, 1333, 2560, 3840] {
+            for height in [500, 501, 811, 1600, 2160] {
                 var canvas = CanvasSpec(); canvas.width = width; canvas.height = height
                 for edge in [1280, 1920, 3840] {
                     let video = try RecordingSpec().fitted(to: canvas, longEdge: edge)
@@ -85,7 +85,7 @@ final class ScriptTests {
         XCTAssertEqual(try video.fitted(to: canvas), video)
     }
 
-    func testDeviceFramesKeepViewportSeparateFromCanvas() throws {
+    func testDeviceFramesScaleContentWithCanvas() throws {
         let oldCanvas = try JSONDecoder().decode(CanvasSpec.self, from: Data(#"{"width":1920,"height":1080}"#.utf8))
         XCTAssertEqual(oldCanvas.frame, .none)
         XCTAssertEqual(oldCanvas.layout.page, CGRect(x: 0, y: 56, width: 1856, height: 960))
@@ -93,16 +93,16 @@ final class ScriptTests {
         XCTAssertEqual(oldCanvas.layout.scale, 1)
         var canvas = oldCanvas
         canvas.frame = .iphone16Pro
-        XCTAssertEqual(canvas.pageWidth, 402); XCTAssertEqual(canvas.pageHeight, 790)
+        XCTAssertEqual(canvas.layout.page.width, 402); XCTAssertEqual(canvas.layout.page.height, 790)
         canvas.frame = .iphoneSE
-        XCTAssertEqual(canvas.pageWidth, 375); XCTAssertEqual(canvas.pageHeight, 647)
+        XCTAssertEqual(canvas.layout.page.width, 375); XCTAssertEqual(canvas.layout.page.height, 647)
         for device in DeviceFrame.allCases {
             canvas.frame = device
             try canvas.validate()
             XCTAssertEqual(try RecordingSpec().fitted(to: canvas), RecordingSpec())
             let encoded = try JSONEncoder().encode(canvas)
             XCTAssertEqual(try JSONDecoder().decode(CanvasSpec.self, from: encoded), canvas)
-            for (width, height) in [(800, 500), (1920, 1080), (900, 1600), (2560, 1600)] {
+            for (width, height) in [(800, 500), (1920, 1080), (900, 1600), (2560, 1600), (3840, 2160)] {
                 canvas.width = width; canvas.height = height
                 try canvas.validate()
                 let layout = canvas.layout
@@ -112,10 +112,22 @@ final class ScriptTests {
                 XCTAssertLessThanOrEqual(frame.maxX, Double(width) - canvas.inset + 0.001)
                 XCTAssertLessThanOrEqual(frame.maxY, Double(height) - canvas.inset + 0.001)
                 XCTAssertTrue(layout.screen.contains(layout.page))
-                if device != .none { XCTAssertEqual(canvas.pageWidth, device.displaySize.width) }
+                if device != .none { XCTAssertEqual(layout.screen.size, device.referenceScreenSize) }
             }
             canvas.width = oldCanvas.width; canvas.height = oldCanvas.height
         }
+        canvas.frame = .macbook; canvas.width = 3288; canvas.height = 2044
+        try canvas.validate()
+        XCTAssertEqual(canvas.pageWidth, 2880); XCTAssertEqual(canvas.pageHeight, 1688)
+        XCTAssertEqual(canvas.layout.canvasPage, CGRect(x: 204, y: 176, width: 2880, height: 1688))
+        canvas.width = 3840; canvas.height = 2160
+        XCTAssertGreaterThanOrEqual(canvas.pageHeight, 1600)
+        let video = try RecordingSpec().fitted(to: canvas, longEdge: 3840)
+        XCTAssertEqual(video.width, 3840); XCTAssertEqual(video.height, 2160)
+        canvas.frame = .macbookPro
+        XCTAssertEqual(canvas.layout.screen.width / canvas.layout.screen.height, 1.6)
+        XCTAssertEqual(canvas.layout.page, canvas.layout.screen)
+        XCTAssertGreaterThanOrEqual(canvas.pageHeight, 1600)
         XCTAssertThrowsError(try JSONDecoder().decode(CanvasSpec.self, from: Data(#"{"frame":"unknown-phone"}"#.utf8)))
         canvas.frame = .none; canvas.width = 800; canvas.height = 500; canvas.inset = 160
         XCTAssertThrowsError(try canvas.validate())

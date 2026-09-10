@@ -5,41 +5,49 @@ Studio 使用原生 macOS 统一工具栏与红绿灯。默认窗口为 1872 × 
 ## 录制真实网页
 
 1. 每次启动打开内置 Orbit 示例；在 Live preview 上方输入自己的地址，点击 Open。支持本地 `http://localhost:3000`、远程 HTTPS 网站和 `file://` 页面。查询参数原样保留，网站通过 WebKit 真实加载和交互。网址不在下次启动时恢复。
-2. Canvas 默认 1920 × 1080。在左侧 Canvas size 选择预设，或输入宽高并按回车／应用按钮。None 框架的网页布局尺寸会减去 inset 和 56 px 浏览器顶栏；设备框架使用自己的固定视口。已有会话保留用户保存的尺寸。
-3. 在 Canvas 的 Backdrop 设置留白和背景，进入 Frame 选择设备及标题栏／状态栏的 Light／Dark 样式。Browser identity 可覆盖浏览器顶栏的标题和地址；留空使用真实信息。接着在 Cursor 和 Text 设置鼠标及字幕效果。
+2. Canvas 默认 1920 × 1080。在左侧 Canvas size 选择预设（最高 4K · 3840 × 2160），或输入宽高并按回车／应用按钮。None 框架的网页布局尺寸会减去 inset 和 56 px 浏览器顶栏；设备框架按比例适配 Canvas，网页视口使用实际屏幕区域。已有会话保留用户保存的尺寸。
+3. 在 Canvas 的 Backdrop 设置留白和背景，进入 Frame 选择设备及 Light／Dark 外观：Light 使用银色机身，Dark 使用深空黑，标题栏／状态栏同步切换。Browser identity 可覆盖浏览器顶栏的标题和地址；留空使用真实信息。接着在 Cursor 和 Text 设置鼠标及字幕效果。
 4. 最后进入 Export，在 Video export 选择输出分辨率与 24、30、60 fps。视频使用偶数像素，保持与 Canvas 相同的比例。修改 Canvas 自动适配输出；自定义视频比例不匹配会提示错误，保留原设置。设置会在下次启动恢复。
-5. 点击顶部 Record，直接录制当前页面；再次点击 Stop take 完成 MP4。打开其他网站不会自动运行 Orbit。导入剧本后，Rehearse 负责排练，「Record storyboard」明确执行并录制整个剧本。
+5. 点击顶部 Record，直接录制当前页面；再次点击 Stop Take 完成 MP4。右上角绿色 LIVE 灯牌表示实时预览，录制时切换为红色 ON AIR。打开其他网站不会自动运行 Orbit。导入剧本后，Rehearse 负责排练，「Record storyboard」明确执行并录制整个剧本。
 
 影片内的浏览器顶栏只保留站点图标、标题、地址及刷新按钮，去掉前进／后退按钮与分割线。站点图标优先读取页面声明的 favicon，然后尝试该站点的 `/favicon.ico`；未提供或加载失败时使用 globe。图标来自真实网页，不随展示标题和地址的覆盖而改变，并同步进入截图和 MP4。
 
-Canvas 范围为 800–2560 × 500–1600，None 框架的网页至少保留 600 × 300；设备框架按可用画布等比适配。视频宽 640–3840、高 360–2160，均为偶数；竖屏和方形会提供符合编码范围的输出预设。输出为无音轨 H.264 MP4。帧率指编码时间轴；机器负载高于实时采集能力时会补重复帧，录制结果包含 `capturedFrames` 和 `duplicatedFrames`，便于检查。
+Canvas 范围为 800–3840 × 500–2160，自定义尺寸与预设共用这一上限。None 框架的网页至少保留 600 × 300；设备框架按可用画布等比适配。视频宽 640–3840、高 360–2160，均为偶数；竖屏和方形会提供符合编码范围的输出预设。输出为无音轨 H.264 MP4。帧率指编码时间轴；机器负载高于实时采集能力时会补重复帧。录制结果中的 `effectiveCaptureFPS` 是实际采集帧数除以影片时长，配合 `capturedFrames`、`duplicatedFrames` 和 `averageRenderMilliseconds` 判断录制流畅度，不能只看设置的 fps。
 
-右上角太阳／月亮切换整个 Studio 的主题并保存偏好。它独立于影片的浏览器顶栏样式，不改变网页的系统配色偏好；网页自身的主题仍由网站控制。右上角通知显示复制、错误和导出结果，鼠标悬停暂停消失计时，通知不会进入 MP4。
+右上角太阳／月亮切换整个 Studio 的主题并保存偏好。它独立于影片的 Frame 外观，不改变网页的系统配色偏好；网页自身的主题仍由网站控制。右上角通知显示复制、错误和导出结果，鼠标悬停暂停消失计时，通知不会进入 MP4。
 
 ## 设备 Frame
 
-Frame 默认选中 None。选择设备后，真实网页自动使用对应的 CSS 视口，触发网站自己的响应式布局；设备外壳同步出现在 Live Preview、Theater、PNG 和 MP4 中。Canvas 与输出尺寸保持原值，留白由 Canvas 的 inset 决定。手机和平板使用状态栏与底部安全区代替桌面浏览器顶栏，MacBook 为屏幕正对镜头的视角。
+Frame 默认选中 None。设备只定义外观和屏幕比例，不限制内容分辨率。外壳按 Canvas/inset 等比居中，网页按屏幕内的可用区域布局；Canvas、Frame 和 Export 分别控制构图尺寸、设备外观和输出像素。手机和平板为状态栏与底部安全区留空，MacBook 为屏幕正对镜头的视角。
 
-| Frame / `canvas.frame` | 逻辑显示尺寸 | 网页视口 |
-| --- | --- | --- |
-| None / `none` | 随 Canvas 变化 | 默认 1856 × 960 |
-| iPhone SE / `iphone-se` | 375 × 667 | 375 × 647 |
-| iPhone 16 Pro / `iphone-16-pro` | 402 × 874 | 402 × 790 |
-| iPhone 16 Pro Max / `iphone-16-pro-max` | 440 × 956 | 440 × 872 |
-| iPad mini / `ipad-mini` | 744 × 1133 | 744 × 1087 |
-| iPad Pro 11″ / `ipad-pro-11` | 834 × 1194 | 834 × 1148 |
-| iPad Pro 13″ / `ipad-pro-13` | 1032 × 1376 | 1032 × 1330 |
-| MacBook 13″ / `macbook` | 1440 × 900 | 1440 × 844 |
+| Frame / `canvas.frame` | 屏幕比例（宽:高） |
+| --- | --- |
+| None / `none` | 随 Canvas 变化 |
+| iPhone SE / `iphone-se` | 375:667 |
+| iPhone 16 Pro / `iphone-16-pro` | 201:437 |
+| iPhone 16 Pro Max / `iphone-16-pro-max` | 110:239 |
+| iPad mini / `ipad-mini` | 744:1133 |
+| iPad Pro 11″ / `ipad-pro-11` | 139:199 |
+| iPad Pro 13″ / `ipad-pro-13` | 3:4 |
+| MacBook 13″ / `macbook` | 16:10 |
+| MacBook Pro 16″ / `macbook-pro` | 16:10 |
 
-尺寸指逻辑像素，已为设备状态区域留空；不是面板物理分辨率。网页仍由 macOS WebKit 加载，保留真实鼠标和键盘事件，不模拟 iOS、触摸 API 或设备 User-Agent。网站是否提供移动布局由其自身实现决定，内置 Orbit 已支持手机和平板。
+MacBook Pro 使用 16 英寸无刘海外观，机身为新款平直底座、直边和小圆角，屏幕直接显示网页，不绘制浏览器顶栏，下边框显示 MacBook Pro。两款 MacBook 的标识使用常规字重 San Francisco，并按可见字形在下边框内水平、垂直居中。
+
+所有设备 Frame 共用 Light／Dark 设置（`canvas.browserTheme`）：Light 对应银色金属外壳，Dark 对应深空黑，侧键、金属边缘和 MacBook 底座一同切换，屏幕玻璃保持黑色。None 仍仅切换浏览器顶栏外观。预览和 PNG／MP4 使用同一套矢量绘制。
+
+网页 CSS 视口随 Canvas 中的屏幕区域变化，可在 Frame 的 Web viewport 查看。Export 决定抓图像素密度：4K Canvas 配合 MacBook 与 4K Export 时，网页不受 1440 × 900 之类的参考绘图尺寸限制；较小 Canvas 也会按 4K 输出所需密度重新采样。网页直接由 WebKit 抓取，外框与字标按目标分辨率绘制，不使用缩小后的工作台预览作为素材。最终视频保持 Canvas 的宽高比，设备内容等比放入屏幕。
+
+网页仍由 macOS WebKit 加载，保留真实鼠标和键盘事件，不模拟 iOS、触摸 API 或设备 User-Agent。网站是否提供移动布局由其自身实现决定。
 
 ```sh
 scripts/showtime settings --frame iphone-16-pro
 scripts/showtime inspect
+scripts/showtime settings --canvas 3840x2160 --frame macbook-pro --video 3840x2160
 scripts/showtime settings --frame none
 ```
 
-MCP 使用 `showtime_settings(canvas: {"frame": "iphone-16-pro"})`，JSON 剧本写入 `canvas.frame`。切换后重新 inspect 获取目标位置；x/y 始终为未放大的网页 CSS 坐标，设备在 Canvas 上的缩放不会改变它。设置会保存；旧剧本未写 `frame` 时仍使用 None。拍摄期间不能切换设备。
+MCP 使用 `showtime_settings(canvas: {"frame": "iphone-16-pro"})`，JSON 剧本写入 `canvas.frame`。更改 Frame、Canvas 尺寸或 inset 后重新 inspect 获取目标位置；x/y 始终为未放大的网页 CSS 坐标。只调整 Export 分辨率不会改变页面布局。设置会保存；旧剧本未写 `frame` 时仍使用 None。拍摄期间不能切换设备。
 
 ## Agent 接口
 

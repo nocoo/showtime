@@ -23,7 +23,8 @@ Pages run in WebKit. Recordings include the browser frame, backdrop, presentatio
 ## Features
 
 - **Real webpage interaction** — Open public sites or local development pages. Move, click, double-click, drag, scroll, and type using CSS selectors or coordinates; wait for elements and check page state.
-- **Camera and composition** — Choreograph zoom, movement, and animated titles, including parallel actions. Choose a backdrop, adjust canvas inset, and independently set the browser title and address shown in the recording.
+- **Camera and composition** — Choreograph zoom, movement, and animated titles, including parallel actions. Choose a backdrop, adjust canvas inset, and independently set the browser title and address shown in the recording. Canvas presets and custom sizes support up to 4K (3840 × 2160).
+- **Device frames** — Choose from three iPhones, three iPads, a front-facing MacBook, and a 16-inch MacBook Pro with a modern flat chassis, with None as the default. All devices use silver in Light and space black in Dark. Frames define screen proportions and appearance; the webpage fits the screen area on the Canvas. Web content and hardware render at the Export resolution, including 4K.
 - **Presentation cursors** — Use macOS arrow and hand artwork, a ring, dot, spotlight, or a custom PNG. Adjust size, color, hotspot, and click effects.
 - **Repeatable scripts** — Save actions as JSON, rehearse, then record. Jobs report progress and individual cue results, support asynchronous execution, and can be stopped early.
 - **Recording and stills** — Export H.264 MP4 or a PNG of the composed canvas. Choose 24, 30, or 60 fps; the default is 1920 × 1080 at 30 fps. Stopping a recording finalizes a playable partial take.
@@ -31,7 +32,30 @@ Pages run in WebKit. Recordings include the browser frame, backdrop, presentatio
 
 ## Installation
 
-Build from source with macOS 14+, Swift 6 / Xcode Command Line Tools, and Python 3.10+. If developer tools are missing, run `xcode-select --install` first.
+Download the universal DMG from [GitHub Releases](https://github.com/nocoo/showtime/releases/latest), open it, and drag `Showtime.app` into Applications. A ZIP archive is also available. The app supports macOS 14+ on Apple Silicon and Intel; browsing and recording require neither Xcode nor source code.
+
+This release uses ad-hoc signing and is not notarized by Apple. If macOS blocks the first launch, try opening the app, then confirm **System Settings → Privacy & Security → Open Anyway**. You can also run:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Showtime.app"
+open "/Applications/Showtime.app"
+```
+
+Replace the path if installed elsewhere; prefix `xattr` with `sudo` if permissions require it. This only removes this app's download quarantine flag; it does not add Apple signing or notarization.
+
+For CLI / MCP access, use **AI Director → Agent integration → Install tools**. Python 3.10+ is required for these optional tools; the app offers download and setup guidance. After installation, add the tools to the current terminal session:
+
+```sh
+export PATH="$HOME/Library/Application Support/Showtime/bin:$PATH"
+showtime status
+showtime mcp-config
+```
+
+The entry point remains stable when the app moves. After upgrading, click **Update tools** if prompted. Normal launches and copying a director brief never install tools automatically.
+
+### Build from source
+
+Source builds need Swift 6 / Xcode Command Line Tools and Python 3.10+. If developer tools are missing, run `xcode-select --install` first.
 
 ```sh
 git clone https://github.com/nocoo/showtime.git

@@ -13,12 +13,13 @@ Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent
 - 用户在当前 shell 加入上述 PATH 后使用 `showtime`。MCP 配置调用同一入口的 `showtime mcp`，由 shell 展开 HOME；POSIX shell 入口查找现有 Python 3.10+，支持常见 Homebrew/python.org 路径并跳过 Apple 系统安装占位程序。不要把 `Bundle.main.resourceURL`、`#filePath`、临时下载或验收目录写入面向用户的指令；不要自动修改 shell profile 或系统 PATH。工具升级必须由用户点击；已安装工具与 App 文件一致才显示已就绪，工具不能在签名包内生成字节码。
 - `package.json` 只管理版本与快捷命令，没有 Node 依赖，不运行 npm/bun install，也不生成 lockfile。
 - 默认 Canvas 为 1920 × 1080；视频默认 1920 × 1080、30 fps。已保存的用户设置和显式剧本配置优先。视频宽高必须为偶数，与 Canvas 同比例。
-- `canvas.frame` 默认 `none`，旧 JSON 也解码为 `none`。设备框架固定真实 WebKit 的 CSS 视口，按 Canvas/inset 等比居中，不改变 Canvas 或视频尺寸；iPhone/iPad 的状态栏和底部安全区不覆盖网页。`FrameLayout` 是预览、合成、鼠标坐标的共同几何来源，`DeviceFrameRenderer` 负责两处一致的原生矢量外壳。手机框架不等同于 iOS/触摸模拟器。
+- `canvas.frame` 默认 `none`，旧 JSON 也解码为 `none`。Frame 只定义设备外观与屏幕比例，按 Canvas/inset 等比居中；参考绘图尺寸不能限制网页或导出分辨率。WebKit 的 CSS 视口使用 `FrameLayout.canvasPage.size`，抓图按 Export 像素密度及镜头缩放采样；外壳与文字在目标分辨率绘制。`FrameLayout` 是预览、合成、鼠标坐标的共同几何来源，`DeviceFrameRenderer` 负责一致的原生矢量外壳。MacBook Pro 为 16 英寸、16:10、无刘海和浏览器顶栏，采用新款平直底座与小圆角，下边框居中显示 MacBook Pro。所有设备外壳、侧键和底座随 `canvas.browserTheme` 切换：light 为银色，dark 为深空黑，独立于 Studio 和网页主题；None 仅切换浏览器顶栏。iPhone/iPad 的状态栏和底部安全区不覆盖网页；手机框架不等同于 iOS/触摸模拟器。
 - 保留原生红绿灯、标题栏拖动/双击、缩放、最小化、全屏和还原。不要用自绘控件替代窗口行为。
 - 页面输入使用真实 WebKit/AppKit 鼠标、键盘和滚轮事件；JavaScript 用于检查、等待与断言，不代替真实点击。
 - Studio Record 录当前网页，不隐式加载或重播 Orbit 剧本。App 的控制 UI、Toast 和导演状态不进入成片。
 - 每次启动固定打开内置 Orbit（`showtime://demo`），清除旧 `lastWebsite` 偏好，不保存或恢复上次访问的网址。公开代码、文档和剧本不写个人测试站点；示例使用 Orbit 或 `http://localhost:3000`，真实测试地址通过 `--url` 传入。
 - 录制取消仍应生成可播放的部分 MP4。不要隐瞒 `duplicatedFrames`；编码帧率与实际采集速度不同。
+- 视频大图合成使用冻结的 Canvas、镜头和网页快照，在后台直接写入编码器的 CVPixelBuffer；AppKit 字幕和鼠标绘制留在主线程，使用同一帧冻结的效果状态。最多预取一帧，与后台合成重叠，不积压网页快照；旧 Canvas 或录制开始前的快照不能写入新 take。预览镜头使用 Core Animation 图层变换，滚动保留原生连续像素手势。优化不能降低 4K 采样密度；通过 `effectiveCaptureFPS`、`capturedFrames`、`duplicatedFrames` 和渲染耗时评估实际效果。
 - 真实网站录像、连接信息与验收截图放进忽略的 `artifacts/`，不要提交私人网页内容或 bearer token。客户端通过 `showtime_client.Client` 读取连接文件。
 - 不要求全局 Accessibility 或 Screen Recording 权限；窗口和页面测试使用本 App 的接口。
 - 图标入口与来源见 `docs/branding.md`：工具栏用透明 `ShowtimeMark.png`，App / Dock 用带背景 ICNS。不要改回导致空白的按名称加载方式。

@@ -10,6 +10,7 @@ public enum DeviceFrame: String, Codable, CaseIterable, Sendable {
     case ipadPro11 = "ipad-pro-11"
     case ipadPro13 = "ipad-pro-13"
     case macbook
+    case macbookPro = "macbook-pro"
 
     public var title: String {
         switch self {
@@ -21,11 +22,12 @@ public enum DeviceFrame: String, Codable, CaseIterable, Sendable {
         case .ipadPro11: return "iPad Pro 11″"
         case .ipadPro13: return "iPad Pro 13″"
         case .macbook: return "MacBook 13″"
+        case .macbookPro: return "MacBook Pro 16″"
         }
     }
 
-    /// Logical display sizes; the webpage uses the space below device status UI.
-    public var displaySize: CGSize {
+    /// Drawing units define screen proportions, never webpage or export resolution.
+    public var referenceScreenSize: CGSize {
         switch self {
         case .none: return .zero
         case .iphoneSE: return CGSize(width: 375, height: 667)
@@ -35,21 +37,23 @@ public enum DeviceFrame: String, Codable, CaseIterable, Sendable {
         case .ipadPro11: return CGSize(width: 834, height: 1194)
         case .ipadPro13: return CGSize(width: 1032, height: 1376)
         case .macbook: return CGSize(width: 1440, height: 900)
+        case .macbookPro: return CGSize(width: 1536, height: 960)
         }
     }
 
     public var isPhone: Bool { self == .iphoneSE || self == .iphone16Pro || self == .iphone16ProMax }
     public var isTablet: Bool { self == .ipadMini || self == .ipadPro11 || self == .ipadPro13 }
+    public var isMacBook: Bool { self == .macbook || self == .macbookPro }
     public var showsBrowserChrome: Bool { self == .none || self == .macbook }
     public var symbol: String {
         if isPhone { return self == .iphoneSE ? "iphone.gen1" : "iphone.gen3" }
         if isTablet { return "ipad" }
-        return self == .macbook ? "laptopcomputer" : "rectangle.dashed"
+        return isMacBook ? "laptopcomputer" : "rectangle.dashed"
     }
 }
 
-/// One coordinate system for the live WebKit view, hardware, exported frames,
-/// and pointer effects. Device fitting never changes its CSS viewport.
+/// Reference hardware geometry fitted to the Canvas. The webpage and pointer
+/// use canvasPage coordinates, independently of the hardware's drawing units.
 public struct FrameLayout: Sendable {
     public let size: CGSize
     public let body: CGRect
@@ -61,7 +65,7 @@ public struct FrameLayout: Sendable {
     public let origin: CGPoint
 
     public init(canvas: CanvasSpec) {
-        let frame = canvas.frame, display = frame.displaySize
+        let frame = canvas.frame, display = frame.referenceScreenSize
         let top: Double, bottom: Double
         switch frame {
         case .none:
@@ -95,6 +99,12 @@ public struct FrameLayout: Sendable {
             screen = CGRect(x: 86, y: 16, width: display.width, height: display.height)
             bodyRadius = 24; screenRadius = 9
             top = CanvasSpec.chromeHeight; bottom = 0
+        case .macbookPro:
+            size = CGSize(width: display.width + 80, height: display.height + 82)
+            body = CGRect(x: 24, y: 0, width: display.width + 32, height: display.height + 56)
+            screen = CGRect(x: 40, y: 16, width: display.width, height: display.height)
+            bodyRadius = 18; screenRadius = 9
+            top = 0; bottom = 0
         }
         page = CGRect(x: screen.minX, y: screen.minY + top, width: screen.width, height: screen.height - top - bottom)
         scale = min((Double(canvas.width) - canvas.inset * 2) / size.width,
@@ -102,6 +112,9 @@ public struct FrameLayout: Sendable {
         origin = CGPoint(x: (Double(canvas.width) - size.width * scale) / 2,
                          y: (Double(canvas.height) - size.height * scale) / 2)
     }
+
+    public var canvasScreen: CGRect { onCanvas(screen) }
+    public var canvasPage: CGRect { onCanvas(page) }
 
     public func onCanvas(_ rect: CGRect) -> CGRect {
         CGRect(x: origin.x + rect.minX * scale, y: origin.y + rect.minY * scale,

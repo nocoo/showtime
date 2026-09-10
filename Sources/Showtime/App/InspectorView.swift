@@ -118,25 +118,29 @@ struct InspectorView: View {
                 frameChoice(.none)
                 frameGroup("iPhone", devices: DeviceFrame.allCases.filter(\.isPhone))
                 frameGroup("iPad", devices: DeviceFrame.allCases.filter(\.isTablet))
-                frameGroup("Mac", devices: [.macbook])
+                frameGroup("Mac", devices: DeviceFrame.allCases.filter(\.isMacBook))
             }
             InspectorSection(title: "Presentation", symbol: "rectangle.inset.filled") {
                 infoRow("Web viewport", value: "\(Int(model.canvas.pageWidth)) × \(Int(model.canvas.pageHeight))")
                 Text(model.canvas.frame == .none
                      ? "A clean browser window, without a device frame."
-                     : "The page uses this viewport in Live Preview and exports. The frame fits your Canvas automatically.")
+                     : "The page fills the screen area on your Canvas. Frames define proportions; Export controls image detail.")
                     .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(model.canvas.frame.showsBrowserChrome ? "Browser title bar" : "Device status bar")
+                    Text(model.canvas.frame == .none ? "Browser title bar" : "Frame appearance")
                         .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
                     StudioSegmentedPicker(title: "Frame appearance", choices: [("light", "Light"), ("dark", "Dark")], selection: Binding(get: { model.canvas.browserTheme }, set: { theme in
                         var canvas = model.canvas; canvas.browserTheme = theme
                         do { try model.applyCapture(canvas: canvas) }
                         catch { model.report(error) }
                     }))
+                    if model.canvas.frame != .none {
+                        Text("Light uses silver; Dark uses space black.")
+                            .font(.system(size: 11)).foregroundStyle(Theme.muted)
+                    }
                 }
-                if model.canvas.frame.isPhone || model.canvas.frame.isTablet {
-                    Text("Phone and tablet frames show your page without the desktop title bar.")
+                if !model.canvas.frame.showsBrowserChrome {
+                    Text("This frame shows your page without the desktop title bar.")
                         .font(.system(size: 11)).foregroundStyle(Theme.muted).lineSpacing(3)
                 }
             }
@@ -164,7 +168,8 @@ struct InspectorView: View {
                     .frame(width: 30).foregroundStyle(selected ? Theme.accent : Theme.muted)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(frame.title).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
-                    Text(frame == .none ? "Browser only · Default" : "\(Int(frame.displaySize.width)) × \(Int(frame.displaySize.height)) display")
+                    Text(frame == .none ? "Browser only · Default" : frame.isMacBook ? "16:10 screen"
+                         : String(format: "%.2f:1 screen", frame.referenceScreenSize.width / frame.referenceScreenSize.height))
                         .font(.system(size: 10)).foregroundStyle(Theme.muted)
                 }
                 Spacer(minLength: 0)

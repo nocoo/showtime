@@ -184,10 +184,12 @@ final class Director {
             let point: CGPoint
             if step.selector != nil || step.x != nil { point = try await target(step) }
             else { point = CGPoint(x: model.pageSize.width * 0.66, y: model.pageSize.height * 0.65) }
+            try browser.scroll(at: point, deltaX: 0, deltaY: 0, phase: .began)
+            defer { try? browser.scroll(at: point, deltaX: 0, deltaY: 0, phase: Task.isCancelled ? .cancelled : .ended) }
             var lastX: Double = 0, lastY: Double = 0
             try await animate(duration: step.duration ?? 0.9, curve: step.easing) { p in
                 let nextX = ((step.deltaX ?? 0) * p).rounded(), nextY = ((step.deltaY ?? 480) * p).rounded()
-                try browser.scroll(at: point, deltaX: nextX - lastX, deltaY: nextY - lastY)
+                try browser.scroll(at: point, deltaX: nextX - lastX, deltaY: nextY - lastY, phase: .changed)
                 lastX = nextX; lastY = nextY
             }
         case .type:
@@ -300,12 +302,17 @@ final class Director {
     private func animate(duration: Double, curve: String?, update: (Double) throws -> Void) async throws {
         if duration <= 0 { try update(1); return }
         let start = CACurrentMediaTime()
+        let interval = 1.0 / 60
         while true {
             try Task.checkCancellation()
             let progress = min(1, (CACurrentMediaTime() - start) / duration)
             try update(Motion.ease(progress, curve: curve ?? "cinematic"))
             if progress >= 1 { break }
-            try await Task.sleep(for: .milliseconds(12))
+            // Keep a steady cadence without accumulating work time or replaying
+            // a burst of old input events after a busy frame.
+            let now = CACurrentMediaTime()
+            let nextTick = start + (floor((now - start) / interval) + 1) * interval
+            try await Task.sleep(for: .seconds(nextTick - now))
         }
     }
 }

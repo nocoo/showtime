@@ -4,12 +4,12 @@ import QuartzCore
 import SwiftUI
 import ShowtimeCore
 
-struct CameraState {
+struct CameraState: Sendable {
     var scale: Double = 1
     var focus = CGPoint(x: CanvasSpec().pageWidth / 2, y: CanvasSpec().pageHeight / 2)
 }
 
-struct PointerState {
+struct PointerState: Sendable {
     var point = CGPoint(x: 1000, y: 530)
     var style = "ring"
     var color = Theme.accentHex
@@ -22,7 +22,7 @@ struct PointerState {
     var customImagePath: String?
 }
 
-struct CaptionState: Identifiable {
+struct CaptionState: Identifiable, Sendable {
     let id = UUID()
     var text: String
     var subtitle: String
@@ -33,7 +33,7 @@ struct CaptionState: Identifiable {
     var duration: Double
 }
 
-struct ClickPulse: Identifiable {
+struct ClickPulse: Identifiable, Sendable {
     let id = UUID()
     var point: CGPoint
     var started: Double
@@ -150,6 +150,11 @@ final class StudioModel: ObservableObject {
          "video": ["width": recordingSettings.width, "height": recordingSettings.height, "fps": recordingSettings.fps]]
     }
     var pageSize: CGSize { CGSize(width: canvas.pageWidth, height: canvas.pageHeight) }
+    func snapshotPixelWidth(for video: RecordingSpec? = nil) -> Double {
+        let video = video ?? recordingSettings
+        let density = max(1, Double(video.width) / Double(canvas.width), Double(video.height) / Double(canvas.height))
+        return ceil(canvas.pageWidth * density * max(1, effects.camera.scale))
+    }
     var demoURL: URL { URL(string: "http://localhost:\(agentPort)/demo/")! }
     var exportFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Showtime", isDirectory: true)
@@ -181,21 +186,42 @@ final class StudioModel: ObservableObject {
         do { try server.start(port: agentPort) }
         catch { report(error) }
         previewTask = Task { @MainActor [weak self] in
+            typealias Capture = (image: CGImage, canvas: CanvasSpec, effects: SceneCompositor.Effects, time: Double)
+            var pending: Task<Capture, Error>?
+            defer { pending?.cancel() }
             while !Task.isCancelled {
                 guard let self else { return }
+                func capture() -> Task<Capture, Error> {
+                    Task { @MainActor in
+                        let canvas = self.canvas
+                        let image = try await self.browser.snapshot()
+                        return (image, canvas, SceneCompositor.Effects(self.effects), CACurrentMediaTime())
+                    }
+                }
                 let tick = CACurrentMediaTime()
                 if self.isRecording || self.effects.camera.scale > 1.001 {
                     do {
-                        let snapshot = try await self.browser.snapshot()
-                        self.browser.surface?.updateCamera(image: snapshot)
-                        if self.isRecording { try await self.recorder.consume(webImage: snapshot, at: CACurrentMediaTime()) }
+                        let snapshot = try await (pending ?? capture()).value
+                        pending = nil
+                        guard !Task.isCancelled else { break }
+                        guard snapshot.canvas == self.canvas else { continue }
+                        // At most one capture overlaps the previous frame's background
+                        // composition. Never queue a backlog of stale webpage images.
+                        if self.isRecording { pending = capture() }
+                        self.browser.surface?.updateCamera(image: snapshot.image)
+                        if self.isRecording {
+                            try await self.recorder.consume(webImage: snapshot.image, at: snapshot.time, effects: snapshot.effects)
+                        }
                     } catch {
+                        pending?.cancel(); pending = nil
                         if self.isRecording { await self.recorder.fail(error) }
                     }
+                } else {
+                    pending?.cancel(); pending = nil
                 }
                 if self.isRecording, self.recorder.elapsed - self.elapsed >= 0.15 { self.elapsed = self.recorder.elapsed }
                 let frameInterval = 1.0 / Double(self.isRecording ? self.recorder.spec.fps : 30)
-                try? await Task.sleep(for: .seconds(max(0.003, frameInterval - (CACurrentMediaTime() - tick))))
+                try? await Task.sleep(for: .seconds(max(0.001, frameInterval - (CACurrentMediaTime() - tick))))
             }
         }
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseUp, .leftMouseDragged]) { [weak self] event in
@@ -369,13 +395,14 @@ final class StudioModel: ObservableObject {
         }
     }
 
-    func chromeImage() throws -> CGImage {
-        let key = "\(displayTitle)|\(displayURL)|\(canvas.pageWidth)|\(canvas.browserTheme)|\(faviconRevision)"
+    func chromeImage(scale: Double) throws -> CGImage {
+        let width = canvas.layout.screen.width, scale = max(1, scale)
+        let key = "\(displayTitle)|\(displayURL)|\(width)|\(scale)|\(canvas.browserTheme)|\(faviconRevision)"
         if key == chromeCacheKey, let chromeCache { return chromeCache }
         let renderer = ImageRenderer(content: BrowserChromeView(model: self, exporting: true)
-            .frame(width: canvas.pageWidth, height: CanvasSpec.chromeHeight)
+            .frame(width: width, height: CanvasSpec.chromeHeight)
             .environment(\.colorScheme, .light))
-        renderer.scale = 2
+        renderer.scale = scale
         guard let image = renderer.cgImage else { throw ShowtimeError("Could not render the browser chrome.") }
         chromeCacheKey = key
         chromeCache = image

@@ -13,6 +13,7 @@ struct RecordingResult {
     var json: [String: Any] {
         ["output": url.path, "width": spec.width, "height": spec.height, "fps": spec.fps,
          "duration": Double(frames) / Double(spec.fps), "frames": frames, "capturedFrames": captures,
+         "effectiveCaptureFPS": Double(captures * spec.fps) / Double(max(1, frames)),
          "duplicatedFrames": max(0, frames - captures), "averageRenderMilliseconds": averageRenderMilliseconds,
          "codec": "h264", "audio": false]
     }
@@ -20,6 +21,12 @@ struct RecordingResult {
 
 @MainActor
 final class MovieRecorder {
+    // The worker finishes writing before ownership returns to the main actor.
+    // No caller may access this buffer while the worker is drawing into it.
+    private struct RenderedPixels: @unchecked Sendable {
+        let buffer: CVPixelBuffer
+    }
+
     unowned let model: StudioModel
     private(set) var spec = RecordingSpec()
     private var writer: AVAssetWriter?
@@ -48,7 +55,7 @@ final class MovieRecorder {
         defer { model.isPreparing = false }
         model.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        let image = try await model.browser.snapshot()
+        let image = try await model.browser.snapshot(pixelWidth: model.snapshotPixelWidth(for: spec))
         try Task.checkCancellation()
         let destination = try OutputFiles.newURL(path: spec.output, defaultFolder: model.exportFolder, ext: "mp4")
         let staging = destination.deletingLastPathComponent().appendingPathComponent(".showtime-\(UUID().uuidString).partial.mp4")
@@ -97,16 +104,42 @@ final class MovieRecorder {
         catch { await fail(error); throw error }
     }
 
-    func consume(webImage: CGImage, at time: Double) async throws {
-        guard model.isRecording, !consuming else { return }
+    func consume(webImage: CGImage, at time: Double, effects capturedEffects: SceneCompositor.Effects? = nil) async throws {
+        guard model.isRecording, !consuming, time >= startTime else { return }
         consuming = true
         defer { consuming = false }
         guard elapsed < 3600 else { throw ShowtimeError("A take is limited to one hour. Finish this take and start another.") }
         let desiredFrame = Int(max(0, time - startTime) * Double(spec.fps))
         guard frameCount <= desiredFrame else { return }
         let renderingStarted = CACurrentMediaTime()
-        let image = try SceneCompositor.render(model: model, webImage: webImage, width: spec.width, height: spec.height)
-        let buffer = try pixelBuffer(for: image)
+        let canvas = model.canvas, effects = capturedEffects ?? SceneCompositor.Effects(model.effects)
+        let camera = effects.camera
+        let backdrop = try SceneCompositor.browserBackdrop(model: model, width: spec.width, height: spec.height)
+        guard let pool = adaptor?.pixelBufferPool else { throw ShowtimeError("The video pixel buffer pool is unavailable.") }
+        // Composite directly into the encoder buffer without blocking native input
+        // or allocating and copying an intermediate full-resolution CGImage.
+        let pixels = try await Task.detached(priority: .userInitiated) {
+            try autoreleasepool {
+                var buffer: CVPixelBuffer?
+                guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer) == kCVReturnSuccess, let buffer else {
+                    throw ShowtimeError("Could not allocate a video frame.")
+                }
+                try Self.draw(in: buffer, canvas: canvas) { context in
+                    SceneCompositor.drawContent(canvas: canvas, camera: camera, webImage: webImage,
+                                                backdrop: backdrop, context: context)
+                }
+                return RenderedPixels(buffer: buffer)
+            }
+        }.value
+        let buffer = pixels.buffer
+        // AppKit cursor artwork and text stay on the main actor. Use the effects
+        // captured with this frame, even if the next animation tick has run.
+        try Self.draw(in: buffer, canvas: canvas) { context in
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+            defer { NSGraphicsContext.restoreGraphicsState() }
+            SceneCompositor.drawEffects(canvas: canvas, effects: effects, context: context, time: time)
+        }
         totalRenderTime += CACurrentMediaTime() - renderingStarted
         while frameCount <= desiredFrame {
             try await append(frameCount == desiredFrame ? buffer : (previousBuffer ?? buffer))
@@ -115,22 +148,22 @@ final class MovieRecorder {
         captureCount += 1
     }
 
-    private func pixelBuffer(for image: CGImage) throws -> CVPixelBuffer {
-        guard let pool = adaptor?.pixelBufferPool else { throw ShowtimeError("The video pixel buffer pool is unavailable.") }
-        var buffer: CVPixelBuffer?
-        guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer) == kCVReturnSuccess, let buffer else {
-            throw ShowtimeError("Could not allocate a video frame.")
+    private nonisolated static func draw(in buffer: CVPixelBuffer, canvas: CanvasSpec,
+                                         body: (CGContext) throws -> Void) throws {
+        guard CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess else {
+            throw ShowtimeError("Could not access the video frame.")
         }
-        CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-        guard let context = CGContext(data: CVPixelBufferGetBaseAddress(buffer), width: spec.width, height: spec.height,
+        let width = CVPixelBufferGetWidth(buffer), height = CVPixelBufferGetHeight(buffer)
+        guard let context = CGContext(data: CVPixelBufferGetBaseAddress(buffer), width: width, height: height,
                                       bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue) else {
             throw ShowtimeError("Could not create the video rendering context.")
         }
-        context.draw(image, in: CGRect(x: 0, y: 0, width: spec.width, height: spec.height))
-        return buffer
+        context.translateBy(x: 0, y: Double(height))
+        context.scaleBy(x: Double(width) / Double(canvas.width), y: -Double(height) / Double(canvas.height))
+        try body(context)
     }
 
     private func append(_ buffer: CVPixelBuffer) async throws {

@@ -134,12 +134,17 @@ struct StudioView: View {
                 if model.isPlaying { model.director.cancel() }
                 else { model.toggleRecording() }
             } label: {
-                Label(recordingTitle, systemImage: model.isPlaying || model.isRecording ? "stop.fill" : "record.circle")
-                    .fontWeight(.semibold).lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                    .frame(minWidth: 82)
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: model.isPlaying || model.isRecording ? "stop.fill" : "record.circle")
+                        .frame(width: 16, height: 16).accessibilityHidden(true)
+                    Text(recordingTitle)
+                }
+                .font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true).frame(minWidth: 82, alignment: .center)
             }
             .buttonStyle(StudioButtonStyle(treatment: model.isPlaying || model.isRecording ? .recording : .accent))
             .disabled(model.isFinishing || model.isPreparing)
+            .accessibilityLabel(recordingTitle)
             .help("Record the current webpage · ⇧⌘Return")
         }.labelStyle(.titleAndIcon).fixedSize(horizontal: true, vertical: false)
             .padding(.trailing, 8).frame(height: 38)
@@ -148,7 +153,24 @@ struct StudioView: View {
     private var recordingTitle: String {
         if model.isPreparing { return "Preparing…" }
         if model.isFinishing { return "Finishing…" }
-        return model.isPlaying || model.isRecording ? "Stop take" : "Record"
+        return model.isPlaying || model.isRecording ? "Stop Take" : "Record"
+    }
+
+    private var broadcastStatus: some View {
+        let tint = model.isRecording ? Theme.recording : Theme.accent
+        let foreground = model.isRecording ? Color.white : Theme.onAccent
+        return HStack(alignment: .center, spacing: 7) {
+            Circle().fill(foreground).frame(width: 6, height: 6)
+                .padding(4).background(foreground.opacity(0.18), in: Circle())
+            Text(model.isRecording ? "ON AIR" : "LIVE")
+                .font(.system(size: 12, weight: .heavy, design: .monospaced)).tracking(1.3)
+        }
+        .foregroundStyle(foreground).frame(width: 114, height: 32)
+        .background(tint, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.22)))
+        .shadow(color: tint.opacity(0.22), radius: 6, y: 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(model.isRecording ? "On air, recording" : "Live preview")
     }
 
     private var canvasArea: some View {
@@ -160,12 +182,7 @@ struct StudioView: View {
                         .font(.system(size: 13)).foregroundStyle(Theme.muted)
                 }
                 Spacer(minLength: 8)
-                HStack(spacing: 6) {
-                    Circle().fill(model.isRecording ? .red : Theme.accent).frame(width: 6, height: 6)
-                    Text(model.isRecording ? "On air" : "Live").font(.system(size: 12, weight: .medium))
-                }.foregroundStyle(model.isRecording ? .red : Theme.accent)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background((model.isRecording ? Color.red : Theme.accent).opacity(0.07), in: Capsule())
+                broadcastStatus
                 VStack(alignment: .trailing, spacing: 4) {
                     Button {
                         model.mode = .studio; model.showInspector = true; model.selectedInspector = "Canvas"
@@ -296,21 +313,23 @@ struct FilmStageView: View {
 
     var body: some View {
         let layout = model.canvas.layout
+        let screen = layout.canvasScreen, page = layout.canvasPage
+        let radius = layout.screenRadius * layout.scale
         ZStack(alignment: .topLeading) {
             FilmBackdrop(style: model.canvas.backdrop, canvas: model.canvas)
             ZStack(alignment: .topLeading) {
-                WebSurfaceView(model: model).frame(width: layout.page.width, height: layout.page.height)
-                    .offset(y: layout.page.minY - layout.screen.minY)
+                WebSurfaceView(model: model).frame(width: page.width, height: page.height)
+                    .offset(y: page.minY - screen.minY)
                 if model.canvas.frame.showsBrowserChrome {
                     BrowserChromeView(model: model).frame(width: layout.screen.width, height: CanvasSpec.chromeHeight)
+                        .scaleEffect(layout.scale, anchor: .topLeading)
+                        .frame(width: screen.width, height: CanvasSpec.chromeHeight * layout.scale, alignment: .topLeading)
                 }
             }
-            .frame(width: layout.screen.width, height: layout.screen.height, alignment: .topLeading)
-            .clipShape(RoundedRectangle(cornerRadius: layout.screenRadius, style: .circular))
-            .overlay(RoundedRectangle(cornerRadius: layout.screenRadius, style: .circular).strokeBorder(.black.opacity(0.10), lineWidth: 0.7).allowsHitTesting(false))
-            .scaleEffect(layout.scale, anchor: .topLeading)
-            .frame(width: layout.screen.width * layout.scale, height: layout.screen.height * layout.scale, alignment: .topLeading)
-            .offset(x: layout.origin.x + layout.screen.minX * layout.scale, y: layout.origin.y + layout.screen.minY * layout.scale)
+            .frame(width: screen.width, height: screen.height, alignment: .topLeading)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .circular))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .circular).strokeBorder(.black.opacity(0.10), lineWidth: 0.7 * layout.scale).allowsHitTesting(false))
+            .offset(x: screen.minX, y: screen.minY)
             EffectsLayer(model: model, effects: effects)
         }
     }

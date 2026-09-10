@@ -66,16 +66,16 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
     }
 
     public var layout: FrameLayout { FrameLayout(canvas: self) }
-    public var pageWidth: Double { layout.page.width }
-    public var pageHeight: Double { layout.page.height }
+    public var pageWidth: Double { layout.canvasPage.width }
+    public var pageHeight: Double { layout.canvasPage.height }
     public var maximumInset: Double {
         max(0, min(160, Double(width - (frame == .none ? 600 : 320)) / 2,
                    (Double(height) - (frame == .none ? 300 + Self.chromeHeight : 320)) / 2))
     }
 
     public func validate() throws {
-        guard (800...2560).contains(width), (500...1600).contains(height) else {
-            throw ShowtimeError("Canvas must be between 800 × 500 and 2560 × 1600 CSS pixels.")
+        guard (800...3840).contains(width), (500...2160).contains(height) else {
+            throw ShowtimeError("Canvas must be between 800 × 500 and 3840 × 2160 CSS pixels.")
         }
         guard inset.isFinite, (0...maximumInset).contains(inset) else {
             throw ShowtimeError("Canvas inset leaves too little room for the browser.")

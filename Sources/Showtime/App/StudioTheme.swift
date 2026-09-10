@@ -21,6 +21,7 @@ enum Theme {
     static let panel = adaptive("panel", light: 0xFFFFFF, dark: 0x1D2721)
     static let field = adaptive("field", light: 0xF8F9F7, dark: 0x253028)
     static let danger = adaptive("danger", light: 0xB74440, dark: 0xFF9E94)
+    static let recording = Color(red: 0.77, green: 0.25, blue: 0.29)
     static let shadow = adaptive("shadow", light: 0x172111, dark: 0x000000, lightAlpha: 0.12, darkAlpha: 0.35)
 
     private static func adaptive(_ name: String, light: UInt32, dark: UInt32,
@@ -58,7 +59,7 @@ private struct StudioButtonSurface: View {
         case .plain: return hovering ? Theme.ink.opacity(0.055) : .clear
         case .soft: return hovering ? Theme.field : Theme.panel
         case .accent: return Theme.accent
-        case .recording: return Color(red: 0.77, green: 0.25, blue: 0.29)
+        case .recording: return Theme.recording
         }
     }
 

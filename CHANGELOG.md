@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.3] - 2026-09-10
+
+- Make LIVE and ON AIR prominent uppercase broadcast badges with a lit indicator and stronger contrast in both Studio themes.
+- Center the Stop Take button's icon and text vertically with an explicit, consistently sized layout.
+- Add a 4K Canvas preset and raise custom Canvas limits to 3840 × 2160 across Studio, scripts, and MCP.
+- Add a 16-inch, 16:10 MacBook Pro frame with a modern flat chassis, small corner radii, and a centered lower-bezel wordmark, without a notch or browser title bar.
+- Apply Light silver and Dark space-black finishes to all device frames, including metal rims, side buttons, and laptop bases, consistently in preview and export.
+- Use device geometry only for proportions and fit the webpage viewport to the Canvas screen area, removing fixed device-resolution limits. Keep live input, camera, and exported content aligned.
+- Capture WebKit content at Export pixel density, including camera zoom, and render browser chrome at the required output scale for sharp 4K composition.
+- Use regular San Francisco lettering for MacBook and MacBook Pro wordmarks and center their visible glyphs within the lower bezel.
+- Composite video content into encoder buffers off the main thread and overlap one pending WebKit capture with rendering, preserving full export resolution and frame-specific effects.
+- Use Core Animation for preview zoom, continuous native scroll gestures, and a steady animation cadence. Reserve cue text space so Theater does not resize between short and long descriptions.
+- Include effectiveCaptureFPS in recording results alongside captured and duplicated frame counts.
+
 ## [1.3.0] - 2026-09-10
 
 - Add an optional Frame inspector with three iPhones, three iPads, and a front-facing MacBook. Devices set a real responsive WebKit viewport while preserving Canvas and video dimensions; hardware, safe areas, camera, and pointer positions match Live Preview and exported PNG/MP4.

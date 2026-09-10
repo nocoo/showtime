@@ -36,13 +36,13 @@ STEP = {"type": "object", "description": "A Showtime action. Coordinates are CSS
 }, "required": ["action"], "additionalProperties": False}
 
 CANVAS_SETTINGS = schema({
-    "width": {"type": "integer", "minimum": 800, "maximum": 2560},
-    "height": {"type": "integer", "minimum": 500, "maximum": 1600},
+    "width": {"type": "integer", "minimum": 800, "maximum": 3840},
+    "height": {"type": "integer", "minimum": 500, "maximum": 2160},
     "inset": NUMBER,
     "backdrop": {"type": "string", "enum": ["mist", "pearl", "midnight"]},
-    "browserTheme": {"type": "string", "enum": ["light", "dark"], "description": "Film browser title bar theme, independent of Studio and webpage appearance."},
-    "frame": {"type": "string", "enum": ["none", "iphone-se", "iphone-16-pro", "iphone-16-pro-max", "ipad-mini", "ipad-pro-11", "ipad-pro-13", "macbook"],
-              "description": "Default none. Device hardware appears in preview and export; the webpage uses a fixed responsive viewport without changing Canvas/video dimensions. Read status.viewport or inspect for CSS coordinates. This does not emulate iOS or touch input."},
+    "browserTheme": {"type": "string", "enum": ["light", "dark"], "description": "Frame appearance: light uses silver hardware, dark uses space black, with matching browser/status bars. Independent of Studio and webpage appearance."},
+    "frame": {"type": "string", "enum": ["none", "iphone-se", "iphone-16-pro", "iphone-16-pro-max", "ipad-mini", "ipad-pro-11", "ipad-pro-13", "macbook", "macbook-pro"],
+              "description": "Default none. Frames define screen proportions and appearance; the webpage uses the fitted screen area on the Canvas and is captured at Export pixel density. Inspect again after changing frame, Canvas size, or inset for current CSS coordinates. This does not emulate iOS or touch input."},
 })
 VIDEO_SETTINGS = schema({
     "width": {"type": "integer", "minimum": 640, "maximum": 3840},

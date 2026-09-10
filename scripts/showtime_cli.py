@@ -37,9 +37,9 @@ def parser():
     settings.add_argument("--fps", type=int, choices=[24, 30, 60])
     settings.add_argument("--inset", type=float)
     settings.add_argument("--backdrop", choices=["mist", "pearl", "midnight"])
-    settings.add_argument("--frame", choices=["none", "iphone-se", "iphone-16-pro", "iphone-16-pro-max", "ipad-mini", "ipad-pro-11", "ipad-pro-13", "macbook"],
-                          help="Device frame and responsive viewport; keeps the Canvas/output size. Default: none")
-    settings.add_argument("--browser-theme", dest="browserTheme", choices=["light", "dark"], help="Film browser title bar, independent of Studio appearance")
+    settings.add_argument("--frame", choices=["none", "iphone-se", "iphone-16-pro", "iphone-16-pro-max", "ipad-mini", "ipad-pro-11", "ipad-pro-13", "macbook", "macbook-pro"],
+                          help="Device proportions and appearance; page fits the Canvas and captures at Export resolution. Default: none")
+    settings.add_argument("--browser-theme", dest="browserTheme", choices=["light", "dark"], help="Frame appearance: light silver or dark space black, including browser/status bars; independent of Studio appearance")
     open_parser = commands.add_parser("open", help="Navigate to a URL (showtime://demo opens Orbit)")
     open_parser.add_argument("url")
     open_parser.add_argument("--title")
