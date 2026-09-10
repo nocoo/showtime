@@ -150,7 +150,7 @@ final class StudioModel: ObservableObject {
          "video": ["width": recordingSettings.width, "height": recordingSettings.height, "fps": recordingSettings.fps]]
     }
     var pageSize: CGSize { CGSize(width: canvas.pageWidth, height: canvas.pageHeight) }
-    var demoURL: URL { URL(string: "http://127.0.0.1:\(agentPort)/demo/")! }
+    var demoURL: URL { URL(string: "http://localhost:\(agentPort)/demo/")! }
     var exportFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Showtime", isDirectory: true)
     }
@@ -160,6 +160,7 @@ final class StudioModel: ObservableObject {
 
     init() {
         browser.owner = self
+        UserDefaults.standard.removeObject(forKey: "lastWebsite")
         if let data = UserDefaults.standard.data(forKey: "captureSettings"),
            let saved = try? JSONDecoder().decode(CaptureSettings.self, from: data),
            (try? saved.canvas.validate()) != nil, (try? saved.video.validate(canvas: saved.canvas)) != nil {
@@ -215,7 +216,7 @@ final class StudioModel: ObservableObject {
         agentReady = true
         statusText = "Your next great demo starts here"
         Task { @MainActor in
-            do { try await browser.open(UserDefaults.standard.string(forKey: "lastWebsite") ?? demoURL.absoluteString) }
+            do { try await browser.open("showtime://demo") }
             catch { report(error) }
         }
     }

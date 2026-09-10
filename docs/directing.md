@@ -27,7 +27,7 @@ Agent 调用 `showtime_run` 或逐个调用 `showtime_act` 时，Theater 下方�
   "canvas": { "width": 1920, "height": 1080, "inset": 32, "backdrop": "mist", "browserTheme": "dark" },
   "recording": { "output": "/tmp/product-demo-new.mp4", "width": 1920, "height": 1080, "fps": 30 },
   "steps": [
-    { "action": "open", "url": "http://127.0.0.1:3000", "label": "Open the product" },
+    { "action": "open", "url": "http://localhost:3000", "label": "Open the product" },
     { "action": "marker", "text": "The first impression" },
     { "action": "cursor", "style": "hand", "size": 32 },
     { "action": "caption", "text": "A clearer way to work.", "style": "minimal", "position": "bottom", "duration": 3 },

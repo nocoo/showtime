@@ -4,7 +4,7 @@ Studio 使用原生 macOS 统一工具栏与红绿灯。默认窗口为 1872 × 
 
 ## 录制真实网页
 
-1. 在 Live preview 上方输入真实地址，点击 Open。支持本地 `http://127.0.0.1:3200/`、`localhost:3000`、远程 HTTPS 网站和 `file://` 页面。查询参数原样保留，网站通过 WebKit 真实加载和交互。
+1. 每次启动打开内置 Orbit 示例；在 Live preview 上方输入自己的地址，点击 Open。支持本地 `http://localhost:3000`、远程 HTTPS 网站和 `file://` 页面。查询参数原样保留，网站通过 WebKit 真实加载和交互。网址不在下次启动时恢复。
 2. Canvas 默认 1920 × 1080。在左侧 Canvas size 选择预设，或输入宽高并按回车／应用按钮。Canvas 使用 CSS 像素；网页布局尺寸会减去 inset 和 56 px 浏览器顶栏。已有会话保留用户保存的尺寸。
 3. 在 Frame & backdrop 设置留白、背景和浏览器顶栏的 Light／Dark 样式。Browser identity 可覆盖影片中展示的标题和地址；留空使用真实信息。接着在 Cursor 和 Text 设置鼠标及字幕效果。
 4. 最后进入 Export，在 Video export 选择输出分辨率与 24、30、60 fps。视频使用偶数像素，保持与 Canvas 相同的比例。修改 Canvas 自动适配输出；自定义视频比例不匹配会提示错误，保留原设置。设置会在下次启动恢复。
@@ -44,7 +44,7 @@ client.request("POST", "/v1/settings", {
 ```sh
 scripts/showtime settings --canvas 1440x900 --video 1920x1200 --fps 60 --browser-theme dark
 scripts/showtime studio --mode theater --theme dark
-scripts/showtime open 'http://127.0.0.1:3200/ai-interpreter/service-overview?w=1d'
+scripts/showtime open 'http://localhost:3000'
 scripts/showtime record start --output /tmp/my-new-take.mp4
 scripts/showtime record stop
 ```
@@ -86,5 +86,5 @@ python3 scripts/test_studio.py --output-dir artifacts/studio-check
 安装 FFmpeg 后，还可在当前 App 验证真实网站录制、三档帧率、横屏／竖屏输出、浏览器顶栏样式与 MCP 进度：
 
 ```sh
-python3 scripts/test_capture.py --url 'http://127.0.0.1:3200/ai-interpreter/service-overview?w=1d' --output-dir artifacts/capture-check
+python3 scripts/test_capture.py --url 'http://localhost:3000' --output-dir artifacts/capture-check
 ```

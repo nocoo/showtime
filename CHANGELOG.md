@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-09-10
+
+- Start every launch on the bundled Orbit demo, remove the old website restore preference, and stop saving visited URLs for the next launch.
+- Remove developer-specific website addresses from public examples and testing instructions.
+- Add a native startup check for old preferences, Orbit interaction, and reopening after visiting another page.
+- Include per-app quarantine removal commands in README installation, signing, and release instructions.
+
 ## [1.2.0] - 2026-09-10
 
 - Redesigned the green Studio with a unified native toolbar, simpler header, larger controls, and icon-led settings.

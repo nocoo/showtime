@@ -37,7 +37,16 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 
 从 [GitHub Releases](https://github.com/nocoo/showtime/releases/latest) 下载通用 App，解压后将 `Showtime.app` 拖入 Applications。支持 macOS 14+ 的 Apple Silicon 与 Intel Mac，运行界面无需 Xcode 或源码。
 
-v1.2.0 使用 ad-hoc 签名，尚未经过 Apple 公证。首次打开如被 macOS 拦截，尝试打开 App 后，在「系统设置 → 隐私与安全 → 仍要打开」确认。CLI / MCP 需要 Python 3.10+；进入 App 的 **AI Director** 页面可一键复制操作指令和当前机器的连接配置。
+当前版本使用 ad-hoc 签名，尚未经过 Apple 公证。首次打开如被 macOS 拦截，尝试打开 App 后，在「系统设置 → 隐私与安全 → 仍要打开」确认；也可以在终端执行：
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Showtime.app"
+open "/Applications/Showtime.app"
+```
+
+安装位置不同时替换路径；如果提示权限不足，在 `xattr` 前加 `sudo`。命令只移除这个 App 的下载隔离标记，Apple 公证状态不变。
+
+每次启动默认打开内置 Orbit 示例，用户或 Agent 可以随后打开自己的网页。CLI / MCP 需要 Python 3.10+；进入 App 的 **AI Director** 页面可一键复制操作指令和当前机器的连接配置。
 
 也可以从源码构建，需要 Swift 6 / Xcode Command Line Tools 和 Python 3.10+。未安装开发工具时，先运行 `xcode-select --install`；签名设置见 [macOS 签名](docs/signing.md)。
 

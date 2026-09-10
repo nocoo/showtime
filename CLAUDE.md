@@ -13,7 +13,8 @@ Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent
 - 默认 Canvas 为 1920 × 1080；视频默认 1920 × 1080、30 fps。已保存的用户设置和显式剧本配置优先。视频宽高必须为偶数，与 Canvas 同比例。
 - 保留原生红绿灯、标题栏拖动/双击、缩放、最小化、全屏和还原。不要用自绘控件替代窗口行为。
 - 页面输入使用真实 WebKit/AppKit 鼠标、键盘和滚轮事件；JavaScript 用于检查、等待与断言，不代替真实点击。
-- Studio Record 录当前网页；只有明确选择示例或剧本时才加载 Orbit。App 的控制 UI、Toast 和导演状态不进入成片。
+- Studio Record 录当前网页，不隐式加载或重播 Orbit 剧本。App 的控制 UI、Toast 和导演状态不进入成片。
+- 每次启动固定打开内置 Orbit（`showtime://demo`），清除旧 `lastWebsite` 偏好，不保存或恢复上次访问的网址。公开代码、文档和剧本不写个人测试站点；示例使用 Orbit 或 `http://localhost:3000`，真实测试地址通过 `--url` 传入。
 - 录制取消仍应生成可播放的部分 MP4。不要隐瞒 `duplicatedFrames`；编码帧率与实际采集速度不同。
 - 真实网站录像、连接信息与验收截图放进忽略的 `artifacts/`，不要提交私人网页内容或 bearer token。客户端通过 `showtime_client.Client` 读取连接文件。
 - 不要求全局 Accessibility 或 Screen Recording 权限；窗口和页面测试使用本 App 的接口。
@@ -47,9 +48,10 @@ SHOWTIME_ARCH=universal scripts/build.sh release
 | 检查 | 命令 / 内容 | 时机 |
 | --- | --- | --- |
 | 核心与静态检查 | `scripts/test.sh`：版本一致性、Swift 检查、构建脚本语法、Python 编译、示例 JS 语法 | 每次相关修改、CI |
+| 启动与旧偏好迁移 | `python3 scripts/test_startup.py --app dist/Showtime.app --output-dir artifacts/startup-check`：旧网址偏好清理、Orbit 首屏、原生点击、访问其他网页后重启 | 启动逻辑变化、发布验收 |
 | 真实输入与取消 | `python3 scripts/test_integration.py --output-dir artifacts/input-check` | 输入、导演、录制变化 |
 | 原生窗口与布局 | `python3 scripts/test_studio.py --output-dir artifacts/studio-check` | 工具栏、布局、窗口变化 |
-| 视频与 MCP | `python3 scripts/test_capture.py --url 'http://127.0.0.1:3200/ai-interpreter/service-overview?w=1d' --output-dir artifacts/capture-check` | Canvas、导出、Agent 流程变化 |
+| 视频与 MCP | `python3 scripts/test_capture.py --url 'http://localhost:3000' --output-dir artifacts/capture-check`，省略 `--url` 使用 Orbit | Canvas、导出、Agent 流程变化 |
 | 压缩包往返 | `python3 scripts/package_release.py --local-preview` | 无证书本地/CI 验证包内容；此包不能作为正式 Release 资产 |
 
 测试输出目录必须新建，不能覆盖已有录像。窗口与录制集成检查共用一个 App，串行运行。它们会操作页面和部分会话状态；结束后恢复目标网站、用户的 Canvas/视频设置、主题与窗口布局。
@@ -82,7 +84,14 @@ python3 scripts/version.py check
 - 无需额外安全确认的公开下载使用 `Developer ID Application` + Hardened Runtime + secure timestamp + Apple notarization + staple。证书名称与公证 profile 可配置，凭据只保存在钥匙串，不提交、不打印私钥或密码。
 - 不关闭 Gatekeeper，不移除用户下载的 quarantine 属性来伪造通过。若证书或公证条件缺失，继续准备本地结果，并明确报告尚未完成的分发环节。
 
-若证书尚未就绪，且用户已知此状态仍授权发布，可以显式使用 `scripts/package_release.py --unnotarized`。必须在 Release 下载区说明临时/开发签名、未公证状态及「系统设置 → 隐私与安全 → 仍要打开」的首次确认方式，不能声称默认 Gatekeeper 已通过。`--unnotarized` 不会自动降级签名，也不消除 quarantine。未来补齐 Developer ID 后发布新版本，不替换已发布资产。v1.2.0 是此类经用户确认的未公证发行。
+若证书尚未就绪，且用户已知此状态仍授权发布，可以显式使用 `scripts/package_release.py --unnotarized`。必须在 README 和每次 Release 的下载区说明实际签名、未公证状态及「系统设置 → 隐私与安全 → 仍要打开」的首次确认方式，并附上以下可复制命令：
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Showtime.app"
+open "/Applications/Showtime.app"
+```
+
+同时说明安装路径可替换、权限不足时在 `xattr` 前加 `sudo`；该操作只移除 App 的下载隔离标记，不增加签名或 Apple 公证。用户已明确要求保留这项安装说明。下载验收仍记录原始 Gatekeeper 结果，不能把移除隔离后的启动声称为默认 Gatekeeper 通过。`--unnotarized` 不会自动降级签名，也不消除 quarantine。未来补齐 Developer ID 后发布新版本，不替换已发布资产。v1.2.0、v1.2.1 使用这类经用户确认的未公证发行。
 
 完整操作见 `docs/signing.md`。CI 只验证通用构建和本地压缩包，不持有个人签名身份，也不自动发布。
 
@@ -103,7 +112,7 @@ python3 scripts/version.py check
 
 3. 从这个 ZIP 解压到全新目录，启动其中的 App。确认无需源码即可加载页面，CLI/MCP 可连接，原生点击和 MP4 导出正常；检查 App 在运行工具后仍通过签名验证。Apple Silicon 和 Intel 架构都必须存在；实际执行过哪些架构要如实记录。
 4. `git diff --check`，按路径 stage，commit，push main。tag 必须指向生成并验证该资产的提交。
-5. 写实际多行 Release notes 文件，内容包括本版本 changelog、下载文件、macOS 14+ / 支持架构、解压并拖到 Applications 的安装方式。不要把历史版本列为新功能。
+5. 写实际多行 Release notes 文件，内容包括本版本 changelog、下载文件、macOS 14+ / 支持架构、解压并拖到 Applications 的安装方式。未公证发行必须复制上方 `xattr` / `open` 命令到 README 和 Release 下载区，并核对公开页面实际显示；不要只链接到签名文档。不要把历史版本列为新功能。
 6. 创建并推送相同版本 tag，再发布含 ZIP 与校验文件的 Release：
 
    ```sh

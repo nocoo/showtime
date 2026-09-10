@@ -72,7 +72,14 @@ CODE_SIGN_IDENTITY=- SHOWTIME_ARCH=universal scripts/build.sh release
 python3 scripts/package_release.py --unnotarized
 ```
 
-此分支仍验证代码签名完整性、架构、资源、App/CLI 版本、压缩包往返与 SHA-256，并记录实际 Gatekeeper 评估；不会声称公证通过。Release 下载说明必须写清「未经过 Apple 公证；首次打开如被 macOS 拦截，在系统设置 → 隐私与安全 → 仍要打开确认」。不能静默把公证失败改成未公证发行。v1.2.0 使用用户已确认的这一发行方式，待证书就绪后在后续版本切换 Developer ID 公证。
+此分支仍验证代码签名完整性、架构、资源、App/CLI 版本、压缩包往返与 SHA-256，并记录实际 Gatekeeper 评估；不会声称公证通过。README 和每次 Release 下载说明必须写清「未经过 Apple 公证；首次打开如被 macOS 拦截，在系统设置 → 隐私与安全 → 仍要打开确认」，并提供命令行打开方式：
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Showtime.app"
+open "/Applications/Showtime.app"
+```
+
+安装路径不同时替换路径；权限不足时在 `xattr` 前加 `sudo`。这只移除当前 App 的下载隔离标记，不增加 Apple 签名或公证。不能静默把公证失败改成未公证发行。v1.2.0、v1.2.1 使用用户已确认的这一发行方式，待证书就绪后在后续版本切换 Developer ID 公证。
 
 不要通过关闭 Gatekeeper 或删除 quarantine 属性来宣称公开下载验证通过。发布后应重新下载 GitHub 上的实际 ZIP，核对 SHA-256，解压运行，验证真实网页与 MP4 导出。macOS 最低版本为 14；通用包包含 arm64 和 x86_64，应区分编译覆盖和实际执行过的架构。
 

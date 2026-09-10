@@ -92,10 +92,6 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
         owner?.actualTitle = webView.title ?? "Untitled"
         owner?.actualURL = webView.url?.absoluteString ?? ""
         loadFavicon()
-        if let owner, let url = webView.url, ["http", "https", "file"].contains(url.scheme ?? ""),
-           !url.absoluteString.hasPrefix(owner.demoURL.absoluteString) {
-            UserDefaults.standard.set(url.absoluteString, forKey: "lastWebsite")
-        }
     }
 
     private func loadFavicon() {
