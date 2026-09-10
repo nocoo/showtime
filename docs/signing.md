@@ -79,7 +79,7 @@ xattr -dr com.apple.quarantine "/Applications/Showtime.app"
 open "/Applications/Showtime.app"
 ```
 
-安装路径不同时替换路径；权限不足时在 `xattr` 前加 `sudo`。这只移除当前 App 的下载隔离标记，不增加 Apple 签名或公证。不能静默把公证失败改成未公证发行。v1.2.0、v1.2.1 使用用户已确认的这一发行方式，待证书就绪后在后续版本切换 Developer ID 公证。
+安装路径不同时替换路径；权限不足时在 `xattr` 前加 `sudo`。这只移除当前 App 的下载隔离标记，不增加 Apple 签名或公证。不能静默把公证失败改成未公证发行。v1.2.0、v1.2.1、v1.3.0 使用用户已确认的这一发行方式，待证书就绪后在后续版本切换 Developer ID 公证。
 
 不要通过关闭 Gatekeeper 或删除 quarantine 属性来宣称公开下载验证通过。发布后应重新下载 GitHub 上的实际 ZIP，核对 SHA-256，解压运行，验证真实网页与 MP4 导出。macOS 最低版本为 14；通用包包含 arm64 和 x86_64，应区分编译覆盖和实际执行过的架构。
 

@@ -267,6 +267,10 @@ private struct WebsiteLocationBar: View {
         .disabled(model.isPlaying || model.isFinishing || model.isPreparing)
         .onAppear { address = model.actualURL }
         .onChange(of: model.actualURL) { _, url in if !focused || !edited { address = url } }
+        .onChange(of: model.addressEditing) { _, editing in
+            if editing && !model.canvas.frame.showsBrowserChrome { address = model.actualURL; focused = true }
+        }
+        .onChange(of: focused) { _, value in if !value && !model.canvas.frame.showsBrowserChrome { model.addressEditing = false } }
     }
     private func open() { focused = false; edited = false; model.navigate(address) }
 }
@@ -291,16 +295,22 @@ struct FilmStageView: View {
     let effects: EffectsState
 
     var body: some View {
-        ZStack {
-            FilmBackdrop(style: model.canvas.backdrop)
-            VStack(spacing: 0) {
-                BrowserChromeView(model: model).frame(height: CanvasSpec.chromeHeight)
-                WebSurfaceView(model: model).frame(width: model.canvas.pageWidth, height: model.canvas.pageHeight)
+        let layout = model.canvas.layout
+        ZStack(alignment: .topLeading) {
+            FilmBackdrop(style: model.canvas.backdrop, canvas: model.canvas)
+            ZStack(alignment: .topLeading) {
+                WebSurfaceView(model: model).frame(width: layout.page.width, height: layout.page.height)
+                    .offset(y: layout.page.minY - layout.screen.minY)
+                if model.canvas.frame.showsBrowserChrome {
+                    BrowserChromeView(model: model).frame(width: layout.screen.width, height: CanvasSpec.chromeHeight)
+                }
             }
-            .frame(width: model.canvas.pageWidth, height: Double(model.canvas.height) - model.canvas.inset * 2)
-            .background(.white).clipShape(RoundedRectangle(cornerRadius: 13))
-            .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(.black.opacity(0.10), lineWidth: 0.7))
-            .shadow(color: .black.opacity(0.19), radius: 25, x: 0, y: 9)
+            .frame(width: layout.screen.width, height: layout.screen.height, alignment: .topLeading)
+            .clipShape(RoundedRectangle(cornerRadius: layout.screenRadius, style: .circular))
+            .overlay(RoundedRectangle(cornerRadius: layout.screenRadius, style: .circular).strokeBorder(.black.opacity(0.10), lineWidth: 0.7).allowsHitTesting(false))
+            .scaleEffect(layout.scale, anchor: .topLeading)
+            .frame(width: layout.screen.width * layout.scale, height: layout.screen.height * layout.scale, alignment: .topLeading)
+            .offset(x: layout.origin.x + layout.screen.minX * layout.scale, y: layout.origin.y + layout.screen.minY * layout.scale)
             EffectsLayer(model: model, effects: effects)
         }
     }

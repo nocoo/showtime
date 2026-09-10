@@ -41,6 +41,8 @@ CANVAS_SETTINGS = schema({
     "inset": NUMBER,
     "backdrop": {"type": "string", "enum": ["mist", "pearl", "midnight"]},
     "browserTheme": {"type": "string", "enum": ["light", "dark"], "description": "Film browser title bar theme, independent of Studio and webpage appearance."},
+    "frame": {"type": "string", "enum": ["none", "iphone-se", "iphone-16-pro", "iphone-16-pro-max", "ipad-mini", "ipad-pro-11", "ipad-pro-13", "macbook"],
+              "description": "Default none. Device hardware appears in preview and export; the webpage uses a fixed responsive viewport without changing Canvas/video dimensions. Read status.viewport or inspect for CSS coordinates. This does not emulate iOS or touch input."},
 })
 VIDEO_SETTINGS = schema({
     "width": {"type": "integer", "minimum": 640, "maximum": 3840},
@@ -50,7 +52,7 @@ VIDEO_SETTINGS = schema({
 
 TOOLS = [
     {"name":"showtime_settings","description":"Read or atomically update the same Canvas and video settings shown in Studio. Canvas uses CSS pixels; video uses even H.264 pixels. Changing canvas automatically fits the output to its aspect ratio unless video dimensions are supplied. Settings persist and apply to live recording. Available between takes.","inputSchema":schema({"canvas":CANVAS_SETTINGS,"video":VIDEO_SETTINGS})},
-    {"name":"showtime_studio","description":"Choose studio, theater, or director workspace and a light/dark Studio theme. Theater shows the real webpage with live director cue cards and progress. Director opens the agent setup guide and is available between takes. Studio appearance does not change the exported film.","inputSchema":schema({"mode":{"type":"string","enum":["studio","theater","director"]},"theme":{"type":"string","enum":["light","dark"]},"inspector":{"type":"string","enum":["Canvas","Cursor","Text","Export"]},"showInspector":BOOL})},
+    {"name":"showtime_studio","description":"Choose studio, theater, or director workspace and a light/dark Studio theme. Theater shows the real webpage with live director cue cards and progress. Director opens the agent setup guide and is available between takes. Studio appearance does not change the exported film.","inputSchema":schema({"mode":{"type":"string","enum":["studio","theater","director"]},"theme":{"type":"string","enum":["light","dark"]},"inspector":{"type":"string","enum":["Canvas","Frame","Cursor","Text","Export"]},"showInspector":BOOL})},
     {"name":"showtime_status","description":"Get the actual and displayed URL/title, viewport size, camera, cursor, and current recording/job state.","inputSchema":schema()},
     {"name":"showtime_inspect","description":"Inspect visible interactive webpage elements. Returns stable CSS selectors, labels, and bounding rectangles. Use before planning real clicks.","inputSchema":schema()},
     {"name":"showtime_open","description":"Navigate the native browser. Optional title/displayURL only change the film's browser chrome. Omit both to show real page details. Use showtime://demo for the bundled Orbit app.","inputSchema":schema({"url":STR,"title":STR,"displayURL":STR},["url"])},

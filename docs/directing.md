@@ -4,13 +4,28 @@ Showtime 的主要操作方式是让 Agent 导演真实网页。用户在 AI Dir
 
 ## 一次完整拍摄
 
-在 Studio 打开目标网站，先在 Canvas 设置画面，在 Cursor 和 Text 预览鼠标与字幕，再在 Export 确认视频尺寸和帧率。进入 AI Director，填写网站地址、要突出展示的流程，以及 30／45／60 秒的目标片长。右侧示意图展示 Agent → Showtime → 视频的关系；下方「Copy instructions for your agent」会复制包括以下内容的一整份任务：
+在 Studio 打开目标网站，先在 Canvas 设置画面，在 Frame 选择可选设备，在 Cursor 和 Text 预览鼠标与字幕，再在 Export 确认视频尺寸和帧率。进入 AI Director，填写网站地址、要突出展示的流程，以及 30／45／60 秒的目标片长。右侧示意图展示 Agent → Showtime → 视频的关系；下方「Copy instructions for your agent」会复制包括以下内容的一整份任务：
 
-- 当前机器的 CLI / MCP 入口，自动读取 App 的本机连接信息。
-- 网站、创意简报、目标片长、输出目录，以及当前 Canvas、顶栏主题、视频分辨率和帧率。
+- 用户目录中的固定 CLI / MCP 入口，自动读取 App 的本机连接信息，不依赖源码或 App 的安装路径。
+- 网站、创意简报、目标片长、输出目录，以及当前 Canvas、设备 Frame、网页视口、顶栏主题、视频分辨率和帧率。
 - 先检查网页、编写有场景和动作名称的剧本、排练、检查截图、正式拍摄、验证导出的步骤。
 
 把整份任务贴给有终端或 MCP 能力的 Agent 即可。保持 Showtime 打开，在 Theater 观察。任务不会要求用户复制 Bearer token；「Connection details」还提供单独的 MCP 配置和 CLI 连接命令。
+
+CLI / MCP 是可选工具，在 **AI Director → Agent integration** 点击 **Install tools** 后才复制到 `~/Library/Application Support/Showtime/bin`；普通启动与复制简报不会安装。页面随后检查 Python 3.10+，缺少时提供 **Download Python** 官方下载入口，安装后选择 **Check Python**。只打开网页、录制或观看 Theater 不需要 Python。已有 MCP 连接时可直接复制简报；未安装 CLI 的简报会明确提示先完成接入。
+
+工具安装完成后，在每个新的 shell 中先运行一次：
+
+```sh
+export PATH="$HOME/Library/Application Support/Showtime/bin:$PATH"
+showtime status
+showtime studio --mode theater
+showtime mcp-config
+```
+
+不修改 shell 配置文件，也不要求管理员权限。MCP 配置通过 `/bin/sh` 展开 `$HOME`，兼容不会自行展开环境变量的客户端。工具入口查找 PATH、Homebrew、python.org 和已安装开发工具中的 Python，并跳过可能弹出开发工具安装窗口的系统 Python 占位程序。
+
+移动或重命名 App 无须改 Agent 的连接配置。App 升级后，页面比较随包文件与已安装工具，有变化时提示 **Update available**；用户点击 **Update tools** 后更新。工具不会在签名 App 包内写入文件或字节码。
 
 「Watch an example」会明确加载并排练 Orbit 示例。正常打开网站、录制当前页面和创建自己的简报均不依赖 Orbit。
 

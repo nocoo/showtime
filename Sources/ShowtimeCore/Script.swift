@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 public struct ShowtimeError: LocalizedError, Sendable {
     public let message: String
@@ -49,6 +50,7 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
     public var inset: Double = 32
     public var backdrop: String = "mist"
     public var browserTheme: String = "light"
+    public var frame: DeviceFrame = .none
     public static let chromeHeight: Double = 56
 
     public init() {}
@@ -60,16 +62,22 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
         inset = try c.decodeIfPresent(Double.self, forKey: .inset) ?? 32
         backdrop = try c.decodeIfPresent(String.self, forKey: .backdrop) ?? "mist"
         browserTheme = try c.decodeIfPresent(String.self, forKey: .browserTheme) ?? "light"
+        frame = try c.decodeIfPresent(DeviceFrame.self, forKey: .frame) ?? .none
     }
 
-    public var pageWidth: Double { Double(width) - inset * 2 }
-    public var pageHeight: Double { Double(height) - inset * 2 - Self.chromeHeight }
+    public var layout: FrameLayout { FrameLayout(canvas: self) }
+    public var pageWidth: Double { layout.page.width }
+    public var pageHeight: Double { layout.page.height }
+    public var maximumInset: Double {
+        max(0, min(160, Double(width - (frame == .none ? 600 : 320)) / 2,
+                   (Double(height) - (frame == .none ? 300 + Self.chromeHeight : 320)) / 2))
+    }
 
     public func validate() throws {
         guard (800...2560).contains(width), (500...1600).contains(height) else {
             throw ShowtimeError("Canvas must be between 800 × 500 and 2560 × 1600 CSS pixels.")
         }
-        guard inset.isFinite, (0...160).contains(inset), pageWidth >= 600, pageHeight >= 300 else {
+        guard inset.isFinite, (0...maximumInset).contains(inset) else {
             throw ShowtimeError("Canvas inset leaves too little room for the browser.")
         }
         guard ["mist", "pearl", "midnight"].contains(backdrop) else {

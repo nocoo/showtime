@@ -227,7 +227,7 @@ final class AutomationServer {
             case ("POST", "/v1/settings"):
                 let object = try dictionary(request.body)
                 guard Set(object.keys).isSubset(of: ["canvas", "video"]) else { throw ShowtimeError("Capture settings accept canvas and video objects.") }
-                let canvas = try merged(model.canvas, patch: object["canvas"] ?? [:], allowed: ["width", "height", "inset", "backdrop", "browserTheme"])
+                let canvas = try merged(model.canvas, patch: object["canvas"] ?? [:], allowed: ["width", "height", "inset", "backdrop", "browserTheme", "frame"])
                 let fitted = try model.recordingSettings.fitted(to: canvas)
                 let video = try merged(fitted, patch: object["video"] ?? [:], allowed: ["width", "height", "fps"])
                 try model.applyCapture(canvas: canvas, video: video)
@@ -246,7 +246,7 @@ final class AutomationServer {
                     appearance = parsed
                 }
                 if let tab = object["inspector"] as? String {
-                    guard ["Canvas", "Cursor", "Text", "Export"].contains(tab) else { throw ShowtimeError("Inspector tab must be Canvas, Cursor, Text, or Export.") }
+                    guard ["Canvas", "Frame", "Cursor", "Text", "Export"].contains(tab) else { throw ShowtimeError("Inspector tab must be Canvas, Frame, Cursor, Text, or Export.") }
                     model.selectedInspector = tab
                     model.showInspector = true
                 }
@@ -303,8 +303,8 @@ final class AutomationServer {
             "displayTitle": model.displayTitle, "displayURL": model.displayURL,
             "favicon": ["loaded": model.favicon != nil],
             "viewport": ["width": model.browser.webView.bounds.width, "height": model.browser.webView.bounds.height],
-            "canvas": ["width": model.canvas.width, "height": model.canvas.height, "inset": model.canvas.inset, "backdrop": model.canvas.backdrop, "browserTheme": model.canvas.browserTheme],
-            "video": ["width": model.recordingSettings.width, "height": model.recordingSettings.height, "fps": model.recordingSettings.fps],
+            "canvas": model.captureState["canvas"]!,
+            "video": model.captureState["video"]!,
             "storyboard": ["name": model.scriptName, "cues": model.currentScript?.steps.count ?? 0],
             "camera": ["scale": model.effects.camera.scale, "x": model.effects.camera.focus.x, "y": model.effects.camera.focus.y],
             "cursor": ["style": model.effects.pointer.style, "visible": model.effects.pointer.visible, "size": model.effects.pointer.size,

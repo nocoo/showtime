@@ -30,13 +30,15 @@ def parser():
     studio = commands.add_parser("studio", help="Choose the workspace mode or light/dark theme")
     studio.add_argument("--mode", choices=["studio", "theater", "director"])
     studio.add_argument("--theme", choices=["light", "dark"])
-    studio.add_argument("--inspector", choices=["Canvas", "Cursor", "Text", "Export"])
+    studio.add_argument("--inspector", choices=["Canvas", "Frame", "Cursor", "Text", "Export"])
     settings = commands.add_parser("settings", help="Read or adjust Canvas dimensions, video resolution, and frame rate")
     settings.add_argument("--canvas", type=dimensions, metavar="WIDTHxHEIGHT")
     settings.add_argument("--video", type=dimensions, metavar="WIDTHxHEIGHT")
     settings.add_argument("--fps", type=int, choices=[24, 30, 60])
     settings.add_argument("--inset", type=float)
     settings.add_argument("--backdrop", choices=["mist", "pearl", "midnight"])
+    settings.add_argument("--frame", choices=["none", "iphone-se", "iphone-16-pro", "iphone-16-pro-max", "ipad-mini", "ipad-pro-11", "ipad-pro-13", "macbook"],
+                          help="Device frame and responsive viewport; keeps the Canvas/output size. Default: none")
     settings.add_argument("--browser-theme", dest="browserTheme", choices=["light", "dark"], help="Film browser title bar, independent of Studio appearance")
     open_parser = commands.add_parser("open", help="Navigate to a URL (showtime://demo opens Orbit)")
     open_parser.add_argument("url")
@@ -71,14 +73,20 @@ def parser():
     rec.add_parser("stop")
     commands.add_parser("stop", help="Stop a job; an interrupted recording is finalized as a playable partial take")
     commands.add_parser("mcp-config", help="Print a ready-to-paste MCP configuration")
+    commands.add_parser("mcp", help="Run the MCP stdio bridge for an agent client")
     return root
 
 
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
+        if args.command == "mcp":
+            from showtime_mcp import main as serve_mcp
+            serve_mcp()
+            return 0
         if args.command == "mcp-config":
-            value = {"mcpServers": {"showtime": {"command": "python3", "args": [str(Path(__file__).resolve().with_name("showtime_mcp.py"))]}}}
+            # Expand HOME in a shell; MCP JSON arguments are not shell-expanded.
+            value = {"mcpServers": {"showtime": {"command": "/bin/sh", "args": ["-c", 'exec "$HOME/Library/Application Support/Showtime/bin/showtime" mcp']}}}
         else:
             client = Client()
             if args.command == "status": value = client.status()
@@ -88,7 +96,7 @@ def main(argv=None):
                 value = client.request("POST", "/v1/studio", body) if body else client.request("GET", "/v1/studio")
             elif args.command == "settings":
                 canvas, video = dict(args.canvas or {}), dict(args.video or {})
-                for key in ("inset", "backdrop", "browserTheme"):
+                for key in ("inset", "backdrop", "browserTheme", "frame"):
                     if getattr(args, key) is not None: canvas[key] = getattr(args, key)
                 if args.fps is not None: video["fps"] = args.fps
                 body = {}

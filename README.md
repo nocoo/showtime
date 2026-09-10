@@ -28,6 +28,7 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 
 - **真实网页交互** — 打开线上或本地开发页面，用 CSS 选择器或坐标移动、点击、双击、拖拽、滚动和输入；等待元素出现，并检查页面状态。
 - **镜头与画面** — 编排镜头缩放、移动和动态标题，组合并行动作；选择背景、调整画布留白，并单独设置画面中的浏览器标题与地址。
+- **设备框架** — 默认 None；支持三种 iPhone、三种 iPad 和正面 MacBook。网页自动使用设备视口，框架进入 Live Preview、截图和录像，Canvas 与输出尺寸保持独立。
 - **演示光标** — 使用 macOS 箭头与手型、圆环、圆点、聚光灯或自定义 PNG，调整大小、颜色、热点和点击效果。
 - **可重复剧本** — 用 JSON 保存动作顺序，先排练，再录制。任务返回进度和每一步的结果，支持异步执行与中途停止。
 - **录制与截图** — 导出 H.264 MP4 或合成画面的 PNG；支持 24、30、60 fps，默认 1920 × 1080 / 30 fps。中止录制会保存可播放的已录部分。
@@ -46,7 +47,19 @@ open "/Applications/Showtime.app"
 
 安装位置不同时替换路径；如果提示权限不足，在 `xattr` 前加 `sudo`。命令只移除这个 App 的下载隔离标记，Apple 公证状态不变。
 
-每次启动默认打开内置 Orbit 示例，用户或 Agent 可以随后打开自己的网页。CLI / MCP 需要 Python 3.10+；进入 App 的 **AI Director** 页面可一键复制操作指令和当前机器的连接配置。
+每次启动默认打开内置 Orbit 示例，用户或 Agent 可以随后打开自己的网页。网页浏览与录制无需额外工具；CLI / MCP 需要 Python 3.10+。
+
+按需进入 **AI Director → Agent integration → Install tools**，安装随 App 附带的 CLI 和 MCP bridge。工具放在 `~/Library/Application Support/Showtime/bin`，无需源码或管理员权限。页面会检查 Python；缺少时可点击 **Download Python**，安装后点击 **Check Python**。普通启动和复制简报都不会安装工具，也不会弹出开发工具安装窗口。
+
+安装完成后可复制整份导演指令、MCP 配置或 CLI 命令。在每个新的终端会话执行一次：
+
+```sh
+export PATH="$HOME/Library/Application Support/Showtime/bin:$PATH"
+showtime status
+showtime studio --mode theater
+```
+
+这只设置当前终端的 PATH。App 移动或重命名后连接入口保持不变；升级 App 后若提示 **Update available**，在同一页面点击 **Update tools**。工具和连接配置不依赖 App 的安装位置，也不包含开发者目录。已有可用 MCP 连接时，可以直接复制简报使用。
 
 也可以从源码构建，需要 Swift 6 / Xcode Command Line Tools 和 Python 3.10+。未安装开发工具时，先运行 `xcode-select --install`；签名设置见 [macOS 签名](docs/signing.md)。
 
@@ -56,38 +69,40 @@ cd showtime
 scripts/run.sh
 ```
 
-运行脚本会构建并打开 `dist/Showtime.app`。使用 CLI 或 MCP 时保持应用运行。先用内置 Orbit 剧本排练，再导出第一段演示：
+运行脚本会构建并打开 `dist/Showtime.app`。使用 CLI 或 MCP 时保持应用运行。完成上面的终端设置后，先用内置 Orbit 剧本排练，再导出第一段演示：
 
 ```sh
-scripts/showtime demo --rehearse
-scripts/showtime demo --output artifacts/orbit-launch.mp4
+showtime demo --rehearse
+showtime demo --output ~/Movies/Showtime/orbit-launch.mp4
 ```
 
 每次导出使用新的文件路径，已有文件不会被覆盖。录制分辨率与画布必须保持相同宽高比。
 
 ## 命令一览
 
-以下命令在仓库根目录运行；`scripts/showtime --help` 查看完整帮助。
+完成上面的终端设置后，以下命令可以在任意目录运行；`showtime --help` 查看完整帮助。源码开发者也可以在仓库根目录使用 `scripts/showtime`。
 
 | 命令 | 说明 |
 | --- | --- |
-| `scripts/showtime status` | 查看页面、镜头、光标、录制与任务状态 |
-| `scripts/showtime open http://localhost:3000` | 打开页面；也支持线上 URL 与 `showtime://demo` |
-| `scripts/showtime inspect` | 获取可见交互元素的选择器、文字和坐标 |
-| `scripts/showtime act '{"action":"click","selector":"#new-project"}'` | 执行单个动作；此例适用于内置 Orbit 页面 |
-| `scripts/showtime run examples/local-product.json --rehearse` | 排练自定义剧本；先替换示例 URL 与选择器 |
-| `scripts/showtime run film.json --output artifacts/film.mp4` | 执行剧本并录制；加 `--no-wait` 可立即取得任务 ID |
-| `scripts/showtime job JOB_ID` / `scripts/showtime wait JOB_ID` | 查询进度或等待完成 |
-| `scripts/showtime record start --output artifacts/take.mp4` | 开始手动或逐步 API 录制；用 `record stop` 完成 |
-| `scripts/showtime screenshot artifacts/frame.png` | 保存包含镜头、光标和文字的合成画面 |
-| `scripts/showtime stop` | 停止当前任务，并收尾保存已录内容 |
-| `scripts/showtime mcp-config` | 输出可直接用于 MCP 客户端的配置 |
+| `showtime status` | 查看页面、镜头、光标、录制与任务状态 |
+| `showtime open http://localhost:3000` | 打开页面；也支持线上 URL 与 `showtime://demo` |
+| `showtime settings --frame iphone-16-pro` | 切换设备框架和真实视口；`--frame none` 恢复浏览器 |
+| `showtime inspect` | 获取可见交互元素的选择器、文字和坐标 |
+| `showtime act '{"action":"click","selector":"#new-project"}'` | 执行单个动作；此例适用于内置 Orbit 页面 |
+| `showtime run film.json --rehearse` | 排练自定义剧本，见下方示例 |
+| `showtime run film.json --output ~/Movies/Showtime/film.mp4` | 执行剧本并录制；加 `--no-wait` 可立即取得任务 ID |
+| `showtime job JOB_ID` / `showtime wait JOB_ID` | 查询进度或等待完成 |
+| `showtime record start --output ~/Movies/Showtime/take.mp4` | 开始手动或逐步 API 录制；用 `record stop` 完成 |
+| `showtime screenshot ~/Movies/Showtime/frame.png` | 保存包含设备框架、镜头、光标和文字的合成画面 |
+| `showtime stop` | 停止当前任务，并收尾保存已录内容 |
+| `showtime mcp-config` | 输出可直接用于 MCP 客户端的配置 |
+| `showtime mcp` | 启动 MCP stdio bridge，由 MCP 客户端调用 |
 
 ### 连接 Agent
 
-运行 `scripts/showtime mcp-config`，将输出合并到支持 MCP stdio 的客户端配置中。配置使用本机 Python 和脚本的绝对路径，不需要手动复制会话凭据。
+运行 `showtime mcp-config`，将输出合并到支持 MCP stdio 的客户端配置中，也可以在 AI Director → Connection details 一键复制。配置通过用户目录中的固定入口启动，自动展开当前用户的 HOME；不包含开发目录、临时下载路径或会话凭据。
 
-MCP 提供 `showtime_status`、`showtime_inspect`、`showtime_open`、`showtime_act`、`showtime_run`、`showtime_job`、`showtime_record` 和 `showtime_screenshot`。典型流程是检查页面元素、规划剧本、排练、验证结果，再录制。
+MCP 提供 `showtime_status`、`showtime_settings`、`showtime_studio`、`showtime_inspect`、`showtime_open`、`showtime_act`、`showtime_run`、`showtime_job`、`showtime_record` 和 `showtime_screenshot`。典型流程是检查页面元素、规划剧本、排练、验证结果，再录制。
 
 ### 编写剧本
 

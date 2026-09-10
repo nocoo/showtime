@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [1.3.0] - 2026-09-10
+
+- Add an optional Frame inspector with three iPhones, three iPads, and a front-facing MacBook. Devices set a real responsive WebKit viewport while preserving Canvas and video dimensions; hardware, safe areas, camera, and pointer positions match Live Preview and exported PNG/MP4.
+- Keep None as the default and preserve older JSON scripts. Expose device selection through CLI, MCP, capture settings, and the AI Director brief.
+- Adapt the bundled Orbit site to phone and tablet viewports and add native device/input/video checks.
+- Add optional CLI / MCP installation and updates in AI Director, with an explicit Python check and download guidance. Opening the app or copying a brief never installs tools or launches dependency installers.
+- Use a stable per-user CLI, add `showtime mcp`, and make agent instructions and MCP configuration independent of developer paths, temporary downloads, and the app's install location. Find an existing Python 3.10+ even with a minimal GUI PATH, without invoking Apple's installer shim.
 
 ## [1.2.1] - 2026-09-10
 

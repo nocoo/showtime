@@ -123,7 +123,7 @@ def main() -> None:
             assessment = subprocess.run(["spctl", "--assess", "--type", "execute", "--verbose=2", str(installed)],
                                         capture_output=True, text=True)
             gatekeeper = {"accepted": assessment.returncode == 0, "details": assessment.stdout + assessment.stderr}
-        cli_version = run(sys.executable, installed / "Contents/Resources/Tools/showtime", "--version").strip()
+        cli_version = run(installed / "Contents/Resources/Tools/showtime", "--version").strip()
         if cli_version != f"showtime {APP_VERSION}":
             raise ValueError(f"Unexpected bundled CLI version: {cli_version}")
         # Exercising the tools must not mutate or invalidate the app signature.

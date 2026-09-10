@@ -146,7 +146,7 @@ final class StudioModel: ObservableObject {
          "showInspector": showInspector, "theater": theaterMode]
     }
     var captureState: [String: Any] {
-        ["canvas": ["width": canvas.width, "height": canvas.height, "inset": canvas.inset, "backdrop": canvas.backdrop, "browserTheme": canvas.browserTheme],
+        ["canvas": ["width": canvas.width, "height": canvas.height, "inset": canvas.inset, "backdrop": canvas.backdrop, "browserTheme": canvas.browserTheme, "frame": canvas.frame.rawValue],
          "video": ["width": recordingSettings.width, "height": recordingSettings.height, "fps": recordingSettings.fps]]
     }
     var pageSize: CGSize { CGSize(width: canvas.pageWidth, height: canvas.pageHeight) }
@@ -155,7 +155,10 @@ final class StudioModel: ObservableObject {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Showtime", isDirectory: true)
     }
     var connectionFile: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Showtime/connection.json")
+        if let path = ProcessInfo.processInfo.environment["SHOWTIME_CONNECTION"], !path.isEmpty {
+            return URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Showtime/connection.json")
     }
 
     init() {
@@ -265,7 +268,7 @@ final class StudioModel: ObservableObject {
         var nextVideo = try script.recording ?? recordingSettings.fitted(to: nextCanvas)
         try nextVideo.validate(canvas: nextCanvas)
         nextVideo.output = nil
-        canvas = nextCanvas
+        updateCanvas(nextCanvas)
         recordingSettings = nextVideo
         currentScript = script
         scriptName = script.name
@@ -280,20 +283,24 @@ final class StudioModel: ObservableObject {
         var nextVideo = try nextVideo ?? recordingSettings.fitted(to: nextCanvas)
         try nextVideo.validate(canvas: nextCanvas)
         nextVideo.output = nil
-        let resized = nextCanvas.width != canvas.width || nextCanvas.height != canvas.height || nextCanvas.inset != canvas.inset
-        canvas = nextCanvas
+        updateCanvas(nextCanvas)
         recordingSettings = nextVideo
         currentScript?.canvas = nextCanvas
         if var recording = currentScript?.recording {
             recording.width = nextVideo.width; recording.height = nextVideo.height; recording.fps = nextVideo.fps
             currentScript?.recording = recording
         }
+        persistCaptureSettings()
+    }
+
+    private func updateCanvas(_ nextCanvas: CanvasSpec) {
+        let resized = nextCanvas.width != canvas.width || nextCanvas.height != canvas.height || nextCanvas.inset != canvas.inset || nextCanvas.frame != canvas.frame
+        canvas = nextCanvas
         if resized {
             effects.camera = CameraState(scale: 1, focus: CGPoint(x: nextCanvas.pageWidth / 2, y: nextCanvas.pageHeight / 2))
             effects.pointer.visible = false
             browser.surface?.updateCamera()
         }
-        persistCaptureSettings()
     }
 
     func rememberRecordingSettings(_ spec: RecordingSpec) {

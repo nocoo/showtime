@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import ShowtimeCore
 
 final class ScriptTests {
@@ -82,6 +83,42 @@ final class ScriptTests {
         video.width = 1920; video.height = 1082; video.fps = 60
         canvas.browserTheme = "dark"
         XCTAssertEqual(try video.fitted(to: canvas), video)
+    }
+
+    func testDeviceFramesKeepViewportSeparateFromCanvas() throws {
+        let oldCanvas = try JSONDecoder().decode(CanvasSpec.self, from: Data(#"{"width":1920,"height":1080}"#.utf8))
+        XCTAssertEqual(oldCanvas.frame, .none)
+        XCTAssertEqual(oldCanvas.layout.page, CGRect(x: 0, y: 56, width: 1856, height: 960))
+        XCTAssertEqual(oldCanvas.layout.origin, CGPoint(x: 32, y: 32))
+        XCTAssertEqual(oldCanvas.layout.scale, 1)
+        var canvas = oldCanvas
+        canvas.frame = .iphone16Pro
+        XCTAssertEqual(canvas.pageWidth, 402); XCTAssertEqual(canvas.pageHeight, 790)
+        canvas.frame = .iphoneSE
+        XCTAssertEqual(canvas.pageWidth, 375); XCTAssertEqual(canvas.pageHeight, 647)
+        for device in DeviceFrame.allCases {
+            canvas.frame = device
+            try canvas.validate()
+            XCTAssertEqual(try RecordingSpec().fitted(to: canvas), RecordingSpec())
+            let encoded = try JSONEncoder().encode(canvas)
+            XCTAssertEqual(try JSONDecoder().decode(CanvasSpec.self, from: encoded), canvas)
+            for (width, height) in [(800, 500), (1920, 1080), (900, 1600), (2560, 1600)] {
+                canvas.width = width; canvas.height = height
+                try canvas.validate()
+                let layout = canvas.layout
+                let frame = layout.onCanvas(CGRect(origin: .zero, size: layout.size))
+                XCTAssertGreaterThanOrEqual(frame.minX, canvas.inset - 0.001)
+                XCTAssertGreaterThanOrEqual(frame.minY, canvas.inset - 0.001)
+                XCTAssertLessThanOrEqual(frame.maxX, Double(width) - canvas.inset + 0.001)
+                XCTAssertLessThanOrEqual(frame.maxY, Double(height) - canvas.inset + 0.001)
+                XCTAssertTrue(layout.screen.contains(layout.page))
+                if device != .none { XCTAssertEqual(canvas.pageWidth, device.displaySize.width) }
+            }
+            canvas.width = oldCanvas.width; canvas.height = oldCanvas.height
+        }
+        XCTAssertThrowsError(try JSONDecoder().decode(CanvasSpec.self, from: Data(#"{"frame":"unknown-phone"}"#.utf8)))
+        canvas.frame = .none; canvas.width = 800; canvas.height = 500; canvas.inset = 160
+        XCTAssertThrowsError(try canvas.validate())
     }
 
     func testParallelTracksCannotRaceForTheSameProperty() throws {

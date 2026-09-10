@@ -120,6 +120,8 @@ def main():
         time.sleep(0.8)
         client.request("POST", "/v1/studio", {"theater": False, "showInspector": True, "inspector": "Canvas"})
         screenshot("canvas")
+        client.request("POST", "/v1/studio", {"inspector": "Frame"})
+        screenshot("frame")
         client.request("POST", "/v1/studio", {"inspector": "Cursor"})
         screenshot("cursor")
         client.request("POST", "/v1/studio", {"inspector": "Text"})

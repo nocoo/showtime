@@ -38,7 +38,10 @@ struct ShowtimeApp: App {
                 Button("Open Film Script…", action: model.importScript).keyboardShortcut("o")
             }
             CommandMenu("Browser") {
-                Button("Open Location") { model.addressEditing = true }.keyboardShortcut("l")
+                Button("Open Location") {
+                    if !model.canvas.frame.showsBrowserChrome { model.mode = .studio }
+                    model.addressEditing = true
+                }.keyboardShortcut("l")
                 Button("Reload Page") { if !model.isPlaying { model.browser.webView.reload() } }.keyboardShortcut("r")
                 Button("Back") { if !model.isPlaying { model.browser.webView.goBack() } }.keyboardShortcut("[", modifiers: .command)
                 Button("Forward") { if !model.isPlaying { model.browser.webView.goForward() } }.keyboardShortcut("]", modifiers: .command)

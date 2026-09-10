@@ -83,7 +83,7 @@ def main():
         assert opened["displayURL"] == actual_url and opened["displayTitle"] == opened["title"]
         check("A real website opens with its original identity and no implicit demo storyboard", url=actual_url)
 
-        mcp.call("showtime_settings", canvas={"width": 1440, "height": 810, "inset": 32, "browserTheme": "light"},
+        mcp.call("showtime_settings", canvas={"width": 1440, "height": 810, "inset": 32, "browserTheme": "light", "frame": "none"},
                  video={"width": 1920, "height": 1080, "fps": 30})
         desktop = mcp.call("showtime_settings", canvas={"height": 900})
         assert desktop["video"] == {"width": 1920, "height": 1200, "fps": 30}

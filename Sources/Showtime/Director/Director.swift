@@ -69,8 +69,7 @@ final class Director {
     private func execute(_ script: FilmScript, jobID: String, singleAction: Bool) async {
         var ownsRecording = false
         do {
-            if let canvas = script.canvas {
-                model.canvas = canvas
+            if script.canvas != nil {
                 try await Task.sleep(for: .milliseconds(180))
                 model.browser.surface?.layoutSubtreeIfNeeded()
             }

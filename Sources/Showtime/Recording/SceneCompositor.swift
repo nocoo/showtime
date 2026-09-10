@@ -24,11 +24,13 @@ enum SceneCompositor {
             defer { NSGraphicsContext.restoreGraphicsState() }
             let canvas = CGRect(x: 0, y: 0, width: model.canvas.width, height: model.canvas.height)
             drawImage(try browserBackdrop(model: model, width: width, height: height), in: canvas, context: ctx)
-            let browser = canvas.insetBy(dx: model.canvas.inset, dy: model.canvas.inset)
-            let outline = CGPath(roundedRect: browser, cornerWidth: 13, cornerHeight: 13, transform: nil)
+            let layout = model.canvas.layout
             ctx.saveGState()
+            ctx.translateBy(x: layout.origin.x, y: layout.origin.y)
+            ctx.scaleBy(x: layout.scale, y: layout.scale)
+            let outline = CGPath(roundedRect: layout.screen, cornerWidth: layout.screenRadius, cornerHeight: layout.screenRadius, transform: nil)
             ctx.addPath(outline); ctx.clip()
-            let page = CGRect(x: browser.minX, y: browser.minY + CanvasSpec.chromeHeight, width: browser.width, height: model.canvas.pageHeight)
+            let page = layout.page
             ctx.saveGState(); ctx.clip(to: page)
             ctx.translateBy(x: page.minX, y: page.minY)
             let camera = model.effects.camera
@@ -36,9 +38,9 @@ enum SceneCompositor {
             ctx.scaleBy(x: camera.scale, y: camera.scale)
             drawImage(webImage, in: CGRect(origin: .zero, size: page.size), context: ctx)
             ctx.restoreGState()
-            ctx.restoreGState()
             ctx.setStrokeColor(NSColor.black.withAlphaComponent(0.1).cgColor)
             ctx.setLineWidth(0.7); ctx.addPath(outline); ctx.strokePath()
+            ctx.restoreGState()
             drawEffects(model: model, context: ctx, time: CACurrentMediaTime())
             guard let image = ctx.makeImage() else { throw ShowtimeError("Could not render the film frame.") }
             return image
@@ -47,7 +49,7 @@ enum SceneCompositor {
 
     private static func browserBackdrop(model: StudioModel, width: Int, height: Int) throws -> CGImage {
         let c = model.canvas
-        let key = "\(width):\(height):\(c.width):\(c.height):\(c.inset):\(c.backdrop):\(c.browserTheme):\(model.displayTitle):\(model.displayURL):\(model.faviconRevision)"
+        let key = "\(width):\(height):\(c.width):\(c.height):\(c.inset):\(c.backdrop):\(c.browserTheme):\(c.frame.rawValue):\(model.displayTitle):\(model.displayURL):\(model.faviconRevision)"
         if let cache = backdropCache, cache.key == key { return cache.image }
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
@@ -55,16 +57,20 @@ enum SceneCompositor {
         }
         context.translateBy(x: 0, y: Double(height))
         context.scaleBy(x: Double(width) / Double(c.width), y: -Double(height) / Double(c.height))
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+        defer { NSGraphicsContext.restoreGraphicsState() }
         let bounds = CGRect(x: 0, y: 0, width: c.width, height: c.height)
         drawBackdrop(context: context, rect: bounds, style: c.backdrop)
-        let browser = bounds.insetBy(dx: c.inset, dy: c.inset)
-        let outline = CGPath(roundedRect: browser, cornerWidth: 13, cornerHeight: 13, transform: nil)
-        context.saveGState()
-        context.setShadow(offset: CGSize(width: 0, height: 9), blur: 25, color: NSColor.black.withAlphaComponent(0.19).cgColor)
-        context.setFillColor(NSColor.white.cgColor); context.addPath(outline); context.fillPath()
-        context.restoreGState()
-        context.addPath(outline); context.clip()
-        drawImage(try model.chromeImage(), in: CGRect(x: browser.minX, y: browser.minY, width: browser.width, height: CanvasSpec.chromeHeight), context: context)
+        DeviceFrameRenderer.draw(canvas: c, context: context)
+        if c.frame.showsBrowserChrome {
+            let layout = c.layout
+            context.translateBy(x: layout.origin.x, y: layout.origin.y)
+            context.scaleBy(x: layout.scale, y: layout.scale)
+            context.addPath(CGPath(roundedRect: layout.screen, cornerWidth: layout.screenRadius, cornerHeight: layout.screenRadius, transform: nil)); context.clip()
+            drawImage(try model.chromeImage(), in: CGRect(x: layout.screen.minX, y: layout.screen.minY,
+                width: layout.screen.width, height: CanvasSpec.chromeHeight), context: context)
+        }
         guard let image = context.makeImage() else { throw ShowtimeError("Could not cache the browser backdrop.") }
         backdropCache = (key, image)
         return image
@@ -95,14 +101,18 @@ enum SceneCompositor {
 
     static func drawEffects(model: StudioModel, context: CGContext, time: Double) {
         let c = model.canvas, effects = model.effects
-        let page = CGRect(x: c.inset, y: c.inset + CanvasSpec.chromeHeight, width: c.pageWidth, height: c.pageHeight)
+        let layout = c.layout, page = layout.page
         let camera = effects.camera
         func position(_ p: CGPoint) -> CGPoint {
             let (x, y) = Motion.cameraPoint(x: p.x, y: p.y, focusX: camera.focus.x, focusY: camera.focus.y, scale: camera.scale)
-            return CGPoint(x: page.minX + x, y: page.minY + y)
+            return CGPoint(x: x, y: y)
         }
         context.saveGState()
-        context.clip(to: page)
+        context.translateBy(x: layout.origin.x, y: layout.origin.y)
+        context.scaleBy(x: layout.scale, y: layout.scale)
+        context.addPath(CGPath(roundedRect: layout.screen, cornerWidth: layout.screenRadius, cornerHeight: layout.screenRadius, transform: nil)); context.clip()
+        context.translateBy(x: page.minX, y: page.minY)
+        context.clip(to: CGRect(origin: .zero, size: page.size))
         for pulse in effects.pulses {
             let progress = min(1, max(0, (time - pulse.started) / 0.75))
             let center = position(pulse.point)
@@ -172,15 +182,21 @@ enum SceneCompositor {
 
 struct FilmBackdrop: NSViewRepresentable {
     var style: String
+    var canvas: CanvasSpec?
     func makeNSView(context: Context) -> BackdropNSView { BackdropNSView() }
-    func updateNSView(_ view: BackdropNSView, context: Context) { view.style = style; view.needsDisplay = true }
+    func updateNSView(_ view: BackdropNSView, context: Context) { view.style = style; view.canvas = canvas; view.needsDisplay = true }
 }
 
 final class BackdropNSView: NSView {
     var style = "mist"
+    var canvas: CanvasSpec?
     override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func draw(_ dirtyRect: NSRect) {
-        if let ctx = NSGraphicsContext.current?.cgContext { SceneCompositor.drawBackdrop(context: ctx, rect: bounds, style: style) }
+        if let ctx = NSGraphicsContext.current?.cgContext {
+            SceneCompositor.drawBackdrop(context: ctx, rect: bounds, style: style)
+            if let canvas { DeviceFrameRenderer.draw(canvas: canvas, context: ctx) }
+        }
     }
 }
 

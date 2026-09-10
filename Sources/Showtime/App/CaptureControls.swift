@@ -61,7 +61,7 @@ struct CaptureControls: View {
                         customCanvas = true
                         applyCanvas(width: width, height: height)
                     }
-                    Text("The browser lays out at this size. Video follows the same aspect ratio.")
+                    Text("The final composition size. Device frames keep their own webpage viewport; video follows the Canvas aspect ratio.")
                         .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 }
             } else {
@@ -129,7 +129,7 @@ struct CaptureControls: View {
 
     private func applyCanvas(width: Int, height: Int) {
         var spec = model.canvas; spec.width = width; spec.height = height
-        spec.inset = min(spec.inset, max(0, min((Double(width) - 600) / 2, (Double(height) - 300 - CanvasSpec.chromeHeight) / 2)))
+        spec.inset = min(spec.inset, spec.maximumInset)
         do { try model.applyCapture(canvas: spec); customVideo = false }
         catch { model.report(error) }
     }

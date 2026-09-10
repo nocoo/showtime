@@ -1,6 +1,6 @@
 # Showtime development guide
 
-Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent 编排真实网页操作，输出 H.264 MP4。主要用户流程是：打开网站 → Canvas → Cursor → Text → Export → AI Director → 在 Theater 观察拍摄。
+Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent 编排真实网页操作，输出 H.264 MP4。主要用户流程是：打开网站 → Canvas → Frame → Cursor → Text → Export → AI Director → 在 Theater 观察拍摄。
 
 ## 项目结构与约束
 
@@ -9,8 +9,11 @@ Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent
 - `Sources/Showtime/Director`：剧本调度、并行动作、Theater 进度；`Recording` 负责 Canvas 合成与视频编码。
 - `Sources/ShowtimeCore`：可校验的剧本与录制配置；`Tests/ShowtimeCoreTests` 是可在 Command Line Tools 环境运行的检查程序。
 - `scripts/showtime`、`showtime_cli.py`、`showtime_mcp.py`：CLI / MCP 入口，打包时一起放进 App；不依赖源码目录。
+- CLI / MCP 只在 **AI Director → Agent integration → Install / Update tools** 的显式点击后，通过 `AgentGuide.installTools()` 安装随包的 6 个文件到 `~/Library/Application Support/Showtime/bin`。启动、进入页面和复制指令不能安装工具、执行 Python 或弹出依赖安装窗口。页面按文件内容识别未安装/已安装/待更新；Python 检查只在安装/检查按钮后执行，缺少时在页面提供官方 Python 下载链接与重新检查。普通网页/录制流程不依赖 Python。
+- 用户在当前 shell 加入上述 PATH 后使用 `showtime`。MCP 配置调用同一入口的 `showtime mcp`，由 shell 展开 HOME；POSIX shell 入口查找现有 Python 3.10+，支持常见 Homebrew/python.org 路径并跳过 Apple 系统安装占位程序。不要把 `Bundle.main.resourceURL`、`#filePath`、临时下载或验收目录写入面向用户的指令；不要自动修改 shell profile 或系统 PATH。工具升级必须由用户点击；已安装工具与 App 文件一致才显示已就绪，工具不能在签名包内生成字节码。
 - `package.json` 只管理版本与快捷命令，没有 Node 依赖，不运行 npm/bun install，也不生成 lockfile。
 - 默认 Canvas 为 1920 × 1080；视频默认 1920 × 1080、30 fps。已保存的用户设置和显式剧本配置优先。视频宽高必须为偶数，与 Canvas 同比例。
+- `canvas.frame` 默认 `none`，旧 JSON 也解码为 `none`。设备框架固定真实 WebKit 的 CSS 视口，按 Canvas/inset 等比居中，不改变 Canvas 或视频尺寸；iPhone/iPad 的状态栏和底部安全区不覆盖网页。`FrameLayout` 是预览、合成、鼠标坐标的共同几何来源，`DeviceFrameRenderer` 负责两处一致的原生矢量外壳。手机框架不等同于 iOS/触摸模拟器。
 - 保留原生红绿灯、标题栏拖动/双击、缩放、最小化、全屏和还原。不要用自绘控件替代窗口行为。
 - 页面输入使用真实 WebKit/AppKit 鼠标、键盘和滚轮事件；JavaScript 用于检查、等待与断言，不代替真实点击。
 - Studio Record 录当前网页，不隐式加载或重播 Orbit 剧本。App 的控制 UI、Toast 和导演状态不进入成片。
@@ -52,11 +55,15 @@ SHOWTIME_ARCH=universal scripts/build.sh release
 | 真实输入与取消 | `python3 scripts/test_integration.py --output-dir artifacts/input-check` | 输入、导演、录制变化 |
 | 原生窗口与布局 | `python3 scripts/test_studio.py --output-dir artifacts/studio-check` | 工具栏、布局、窗口变化 |
 | 视频与 MCP | `python3 scripts/test_capture.py --url 'http://localhost:3000' --output-dir artifacts/capture-check`，省略 `--url` 使用 Orbit | Canvas、导出、Agent 流程变化 |
+| 设备框架 | `python3 scripts/test_frames.py --output-dir artifacts/frame-check`：全部尺寸、窄屏真实输入、缩放、Canvas 适配、原生预览和三类 MP4 | Frame、视口和合成变化 |
+| Agent 工具 | 在 AI Director 点击 Install tools，再运行 `python3 scripts/test_agent_tools.py --app dist/Showtime.app --output-dir artifacts/agent-tools-check`；可用 `--brief` 检查保存的剪贴板指令 | CLI、MCP、按需安装和发布验收 |
 | 压缩包往返 | `python3 scripts/package_release.py --local-preview` | 无证书本地/CI 验证包内容；此包不能作为正式 Release 资产 |
 
 测试输出目录必须新建，不能覆盖已有录像。窗口与录制集成检查共用一个 App，串行运行。它们会操作页面和部分会话状态；结束后恢复目标网站、用户的 Canvas/视频设置、主题与窗口布局。
 
-发布前运行最终 Release 二进制：验证默认窗口居中与 1920 × 1080 Canvas、工具栏/Dock 图标、Light/Dark、Toast、下拉框对齐、四个 Inspector、AI Director 一键复制、Theater 当前/下一动作；检查红绿灯、标题栏双击及窗口还原。使用真实站点先排练再拍摄，检查 MP4 的尺寸、帧率、时长及代表帧。与改动相关的检查通过后，不无故重复全部测试。
+若另一个 Agent 正在操作常用 App，使用独立测试副本、独立 bundle ID 与空闲 `SHOWTIME_PORT`，并让 App 和测试客户端使用同一个绝对 `SHOWTIME_CONNECTION` 路径。该文件放在忽略的 `artifacts/` 私有子目录。不要让集成检查覆盖其他 Agent 的连接、会话或录像。
+
+发布前运行最终 Release 二进制：验证默认窗口居中与 1920 × 1080 Canvas、工具栏/Dock 图标、Light/Dark、Toast、下拉框对齐、五个 Inspector、Frame 默认为 None、AI Director 一键复制、Theater 当前/下一动作；检查红绿灯、标题栏双击及窗口还原。使用真实站点先排练再拍摄，检查 MP4 的尺寸、帧率、时长及代表帧。与改动相关的检查通过后，不无故重复全部测试。
 
 ## 版本号
 
@@ -91,7 +98,7 @@ xattr -dr com.apple.quarantine "/Applications/Showtime.app"
 open "/Applications/Showtime.app"
 ```
 
-同时说明安装路径可替换、权限不足时在 `xattr` 前加 `sudo`；该操作只移除 App 的下载隔离标记，不增加签名或 Apple 公证。用户已明确要求保留这项安装说明。下载验收仍记录原始 Gatekeeper 结果，不能把移除隔离后的启动声称为默认 Gatekeeper 通过。`--unnotarized` 不会自动降级签名，也不消除 quarantine。未来补齐 Developer ID 后发布新版本，不替换已发布资产。v1.2.0、v1.2.1 使用这类经用户确认的未公证发行。
+同时说明安装路径可替换、权限不足时在 `xattr` 前加 `sudo`；该操作只移除 App 的下载隔离标记，不增加签名或 Apple 公证。用户已明确要求保留这项安装说明。下载验收仍记录原始 Gatekeeper 结果，不能把移除隔离后的启动声称为默认 Gatekeeper 通过。`--unnotarized` 不会自动降级签名，也不消除 quarantine。未来补齐 Developer ID 后发布新版本，不替换已发布资产。v1.2.0、v1.2.1、v1.3.0 使用这类经用户确认的未公证发行。
 
 完整操作见 `docs/signing.md`。CI 只验证通用构建和本地压缩包，不持有个人签名身份，也不自动发布。
 
@@ -111,6 +118,8 @@ open "/Applications/Showtime.app"
    名称/profile 是示例，使用本机已配置的真实名称。正式包为 `dist/release-vX.Y.Z/Showtime-X.Y.Z-macos-universal.zip`，附 `.sha256`；脚本检查完整资源、App/CLI 版本、架构、签名、公证结果、staple 和 Gatekeeper，并校验解压后的 App。公证分发仅接受 `Accepted`；经用户授权的未公证发行走上文的显式 `--unnotarized` 分支，并保留真实 Gatekeeper 检查结果。
 
 3. 从这个 ZIP 解压到全新目录，启动其中的 App。确认无需源码即可加载页面，CLI/MCP 可连接，原生点击和 MP4 导出正常；检查 App 在运行工具后仍通过签名验证。Apple Silicon 和 Intel 架构都必须存在；实际执行过哪些架构要如实记录。
+
+   验证 AI Director 按需安装与复制：未安装时普通启动、进入页面、复制简报不能写入工具；缺少 Python 时展示页内安装入口。点击 Install tools 后从非仓库目录运行 CLI，用仅含系统 PATH 的 GUI 环境通过复制的 MCP 配置完成握手和状态查询。指令不得含开发者用户名、源码路径、`artifacts` 或 App 临时安装位置。移动或重命名解压的 App、重新启动后入口仍应有效；工具变化提示 Update tools，不能静默升级。README 用户命令必须使用此稳定入口；源码开发命令可以继续使用 `scripts/showtime`。
 4. `git diff --check`，按路径 stage，commit，push main。tag 必须指向生成并验证该资产的提交。
 5. 写实际多行 Release notes 文件，内容包括本版本 changelog、下载文件、macOS 14+ / 支持架构、解压并拖到 Applications 的安装方式。未公证发行必须复制上方 `xattr` / `open` 命令到 README 和 Release 下载区，并核对公开页面实际显示；不要只链接到签名文档。不要把历史版本列为新功能。
 6. 创建并推送相同版本 tag，再发布含 ZIP 与校验文件的 Release：
@@ -128,5 +137,6 @@ open "/Applications/Showtime.app"
 
 7. 用 `gh release view` 核对 tag/资产，再用 `gh release download` 到新目录，核对 SHA-256、解压签名和启动。记录 Release URL、commit/tag、ZIP hash、签名/公证事实和验收产物。
 8. 发布约 5 分钟后用 `gh run list --limit 5` 查看该提交的 CI；失败先调查修复，不把未完成或失败的 CI 报为通过。等待期间仍应及时同步进度。
+9. 恢复验收前的用户设置，清理仅由验收安装的工具。用户要求关闭 App 时，下载验收后通过空闲状态下的 `/v1/app/quit` 退出，并确认没有遗留的 Showtime 进程。
 
 不要改动 Hexly 或其他项目的版本、网站或发布计划来完成 Showtime 的发布。

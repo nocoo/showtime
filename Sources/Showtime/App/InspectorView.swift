@@ -14,6 +14,7 @@ struct InspectorView: View {
         VStack(spacing: 16) {
             VStack(spacing: 4) {
                 navigationItem("Canvas", symbol: "rectangle.inset.filled")
+                navigationItem("Frame", symbol: "iphone.gen3")
                 navigationItem("Cursor", symbol: "cursorarrow.rays")
                 navigationItem("Text", symbol: "textformat")
                 navigationItem("Export", symbol: "square.and.arrow.up")
@@ -22,6 +23,7 @@ struct InspectorView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     switch model.selectedInspector {
+                    case "Frame": frameControls
                     case "Cursor": cursorControls
                     case "Text": textControls
                     case "Export": CaptureControls(model: model, section: .video)
@@ -60,15 +62,7 @@ struct InspectorView: View {
     private var canvasControls: some View {
         Group {
             CaptureControls(model: model, section: .canvas)
-            InspectorSection(title: "Frame & backdrop", symbol: "photo.on.rectangle.angled") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Browser title bar").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
-                    StudioSegmentedPicker(title: "Browser title bar", choices: [("light", "Light"), ("dark", "Dark")], selection: Binding(get: { model.canvas.browserTheme }, set: { theme in
-                        var canvas = model.canvas; canvas.browserTheme = theme
-                        do { try model.applyCapture(canvas: canvas) }
-                        catch { model.report(error) }
-                    })).disabled(model.isBusy)
-                }
+            InspectorSection(title: "Backdrop", symbol: "photo.on.rectangle.angled") {
                 HStack(spacing: 9) {
                     ForEach(["mist", "pearl", "midnight"], id: \.self) { style in
                         Button {
@@ -98,8 +92,8 @@ struct InspectorView: View {
                         var canvas = model.canvas; canvas.inset = $0.rounded()
                         do { try model.applyCapture(canvas: canvas) }
                         catch { model.report(error) }
-                    }), in: 0...min(160, Double(model.canvas.width - 600) / 2, (Double(model.canvas.height) - 300 - CanvasSpec.chromeHeight) / 2))
-                        .controlSize(.small).disabled(model.isBusy).accessibilityLabel("Browser inset")
+                    }), in: 0...model.canvas.maximumInset)
+                        .controlSize(.small).disabled(model.isBusy).accessibilityLabel("Canvas inset")
                 }
             }
             InspectorSection(title: "Browser identity", symbol: "globe") {
@@ -116,6 +110,73 @@ struct InspectorView: View {
             }
             cameraControls
         }
+    }
+
+    private var frameControls: some View {
+        Group {
+            InspectorSection(title: "Device frame", symbol: "macbook.and.iphone") {
+                frameChoice(.none)
+                frameGroup("iPhone", devices: DeviceFrame.allCases.filter(\.isPhone))
+                frameGroup("iPad", devices: DeviceFrame.allCases.filter(\.isTablet))
+                frameGroup("Mac", devices: [.macbook])
+            }
+            InspectorSection(title: "Presentation", symbol: "rectangle.inset.filled") {
+                infoRow("Web viewport", value: "\(Int(model.canvas.pageWidth)) × \(Int(model.canvas.pageHeight))")
+                Text(model.canvas.frame == .none
+                     ? "A clean browser window, without a device frame."
+                     : "The page uses this viewport in Live Preview and exports. The frame fits your Canvas automatically.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(model.canvas.frame.showsBrowserChrome ? "Browser title bar" : "Device status bar")
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                    StudioSegmentedPicker(title: "Frame appearance", choices: [("light", "Light"), ("dark", "Dark")], selection: Binding(get: { model.canvas.browserTheme }, set: { theme in
+                        var canvas = model.canvas; canvas.browserTheme = theme
+                        do { try model.applyCapture(canvas: canvas) }
+                        catch { model.report(error) }
+                    }))
+                }
+                if model.canvas.frame.isPhone || model.canvas.frame.isTablet {
+                    Text("Phone and tablet frames show your page without the desktop title bar.")
+                        .font(.system(size: 11)).foregroundStyle(Theme.muted).lineSpacing(3)
+                }
+            }
+        }.disabled(model.isBusy)
+    }
+
+    private func frameGroup(_ title: String, devices: [DeviceFrame]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.muted)
+                .padding(.top, 4).padding(.leading, 2)
+            ForEach(devices, id: \.self) { frameChoice($0) }
+        }
+    }
+
+    private func frameChoice(_ frame: DeviceFrame) -> some View {
+        let selected = model.canvas.frame == frame
+        return Button {
+            var canvas = model.canvas; canvas.frame = frame
+            canvas.inset = min(canvas.inset, canvas.maximumInset)
+            do { try model.applyCapture(canvas: canvas) }
+            catch { model.report(error) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: frame.symbol).font(.system(size: 23, weight: .light))
+                    .frame(width: 30).foregroundStyle(selected ? Theme.accent : Theme.muted)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(frame.title).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
+                    Text(frame == .none ? "Browser only · Default" : "\(Int(frame.displaySize.width)) × \(Int(frame.displaySize.height)) display")
+                        .font(.system(size: 10)).foregroundStyle(Theme.muted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: selected ? "smallcircle.filled.circle" : "circle")
+                    .font(.system(size: 13, weight: .regular)).foregroundStyle(selected ? Theme.accent : Theme.line)
+            }
+            .padding(.horizontal, 10).frame(height: 55)
+            .background(selected ? Theme.accent.opacity(0.06) : Theme.field, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? Theme.accent.opacity(0.5) : Theme.line, lineWidth: 0.75))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }.buttonStyle(.plain).accessibilityLabel("\(frame.title) frame")
+            .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private var cameraControls: some View {

@@ -33,7 +33,7 @@ def main():
         # Orbit intentionally overflows at this authored viewport. At the new
         # 1920 × 1080 default it fits vertically, so a scroll cannot change scrollTop.
         client.request("POST", "/v1/settings", {
-            "canvas": {"width": 1440, "height": 810, "inset": 32},
+            "canvas": {"width": 1440, "height": 810, "inset": 32, "frame": "none"},
             "video": {"width": 1920, "height": 1080, "fps": 30},
         })
         check_input(client, output)

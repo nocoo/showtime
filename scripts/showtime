@@ -1,7 +1,17 @@
-#!/usr/bin/env python3
-import sys
-
-# Bundled tools must never write bytecode into the signed app.
-sys.dont_write_bytecode = True
-from showtime_cli import main
-raise SystemExit(main())
+#!/bin/sh
+# A GUI-launched MCP client often has only /usr/bin:/bin in PATH. Find an
+# existing Python without invoking Apple's /usr/bin/python3 installer shim.
+showtime_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+showtime_developer_dir=$(/usr/bin/xcode-select -p 2>/dev/null)
+for showtime_python in "$(command -v python3)" /opt/homebrew/bin/python3 /usr/local/bin/python3 \
+    "${showtime_developer_dir:+$showtime_developer_dir/usr/bin/python3}"
+do
+    [ -x "$showtime_python" ] || continue
+    [ "$showtime_python" != /usr/bin/python3 ] || continue
+    if "$showtime_python" -I -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1; then
+        # -B keeps the signed bundle and installed tools free of bytecode.
+        exec "$showtime_python" -B "$showtime_dir/showtime_cli.py" "$@"
+    fi
+done
+printf '%s\n' 'Showtime needs Python 3.10 or later. Open AI Director → Agent integration for the Python download link, then check again.' >&2
+exit 1
