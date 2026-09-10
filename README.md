@@ -12,6 +12,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-4A8234" alt="MIT License" /></a>
 </p>
 
+<p align="center">
+  <img src="docs/images/showtime.jpg" width="960" alt="Showtime 原生 macOS 工作台：Canvas 设置、真实网页预览与 Agent 导演入口" />
+</p>
+
 ---
 
 ## 这是什么
@@ -31,7 +35,11 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 
 ## 安装
 
-目前从源码构建，需要 macOS 14+、Swift 6 / Xcode Command Line Tools，以及 Python 3.10+。未安装开发工具时，先运行 `xcode-select --install`。
+从 [GitHub Releases](https://github.com/nocoo/showtime/releases/latest) 下载通用 App，解压后将 `Showtime.app` 拖入 Applications。支持 macOS 14+ 的 Apple Silicon 与 Intel Mac，运行界面无需 Xcode 或源码。
+
+v1.2.0 使用 ad-hoc 签名，尚未经过 Apple 公证。首次打开如被 macOS 拦截，尝试打开 App 后，在「系统设置 → 隐私与安全 → 仍要打开」确认。CLI / MCP 需要 Python 3.10+；进入 App 的 **AI Director** 页面可一键复制操作指令和当前机器的连接配置。
+
+也可以从源码构建，需要 Swift 6 / Xcode Command Line Tools 和 Python 3.10+。未安装开发工具时，先运行 `xcode-select --install`；签名设置见 [macOS 签名](docs/signing.md)。
 
 ```sh
 git clone https://github.com/nocoo/showtime.git
