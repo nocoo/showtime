@@ -314,7 +314,7 @@ struct FilmStageView: View {
     var body: some View {
         let layout = model.canvas.layout
         let screen = layout.canvasScreen, page = layout.canvasPage
-        let radius = layout.screenRadius * layout.scale
+        let outline = Path(layout.screenPath(in: CGRect(origin: .zero, size: screen.size)))
         ZStack(alignment: .topLeading) {
             FilmBackdrop(style: model.canvas.backdrop, canvas: model.canvas)
             ZStack(alignment: .topLeading) {
@@ -327,8 +327,8 @@ struct FilmStageView: View {
                 }
             }
             .frame(width: screen.width, height: screen.height, alignment: .topLeading)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .circular))
-            .overlay(RoundedRectangle(cornerRadius: radius, style: .circular).strokeBorder(.black.opacity(0.10), lineWidth: 0.7 * layout.scale).allowsHitTesting(false))
+            .clipShape(outline)
+            .overlay(outline.stroke(.black.opacity(0.10), lineWidth: 0.7 * layout.scale).allowsHitTesting(false))
             .offset(x: screen.minX, y: screen.minY)
             EffectsLayer(model: model, effects: effects)
         }

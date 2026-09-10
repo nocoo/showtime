@@ -135,7 +135,9 @@ struct InspectorView: View {
                         catch { model.report(error) }
                     }))
                     if model.canvas.frame != .none {
-                        Text("Light uses silver; Dark uses space black.")
+                        Text(model.canvas.frame == .macbookNeo
+                             ? "Light uses silver; Dark uses indigo."
+                             : "Light uses silver; Dark uses space black.")
                             .font(.system(size: 11)).foregroundStyle(Theme.muted)
                     }
                 }
@@ -168,7 +170,9 @@ struct InspectorView: View {
                     .frame(width: 30).foregroundStyle(selected ? Theme.accent : Theme.muted)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(frame.title).font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.ink).lineLimit(1)
-                    Text(frame == .none ? "Browser only · Default" : frame.isMacBook ? "16:10 screen"
+                    Text(frame == .none ? "Browser only · Default"
+                         : frame == .macbookNeo ? "2026 · 13″ Liquid Retina"
+                         : frame == .macbookPro ? "2026 · 16.2″ Liquid Retina XDR"
                          : String(format: "%.2f:1 screen", frame.referenceScreenSize.width / frame.referenceScreenSize.height))
                         .font(.system(size: 10)).foregroundStyle(Theme.muted)
                 }

@@ -57,15 +57,18 @@ def main():
         mcp.call("showtime_settings", canvas={"width": 1920, "height": 1080, "inset": 32, "frame": "none", "browserTheme": "light"},
                  video={"width": 1920, "height": 1080, "fps": 30})
         mcp.call("showtime_open", url="showtime://demo")
-        cases = [("none", 1856, 960, 1016), ("iphone-se", 375, 647, 889), ("iphone-16-pro", 402, 790, 898),
-                 ("iphone-16-pro-max", 440, 872, 980), ("ipad-mini", 744, 1087, 1253),
+        cases = [("none", 1856, 960, 1016), ("iphone-16-pro", 402, 790, 898),
+                 ("iphone-16-pro-max", 440, 872, 980),
                  ("ipad-pro-11", 834, 1148, 1238), ("ipad-pro-13", 1032, 1330, 1420),
-                 ("macbook", 1440, 844, 990), ("macbook-pro", 1536, 960, 1042)]
+                 ("macbook-neo", 1204, 697, 912), ("macbook-pro", 1728, 1080, 1251)]
+        settings_tool = next(tool for tool in mcp.request("tools/list", {})["tools"] if tool["name"] == "showtime_settings")
+        assert settings_tool["inputSchema"]["properties"]["canvas"]["properties"]["frame"]["enum"] == [case[0] for case in cases]
+        check("MCP advertises the current device list")
         for frame, width, height, frame_height in cases:
             # These devices fit the 1016 px available height of the default Canvas.
             width, height = width * 1016 / frame_height, height * 1016 / frame_height
             # Exercise the same MCP setting consumed by scripts and the sidebar.
-            settings = mcp.call("showtime_settings", canvas={"frame": frame})
+            settings = mcp.call("showtime_settings", canvas={"frame": frame, "browserTheme": "light"})
             assert settings["canvas"]["width"] == 1920 and settings["canvas"]["height"] == 1080
             assert settings["video"] == {"width": 1920, "height": 1080, "fps": 30}
             wait_viewport(width, height)
@@ -80,6 +83,19 @@ def main():
             client.request("POST", "/v1/screenshot", {"output": str(output / f"{frame}-film.png")})
             client.request("POST", "/v1/studio/screenshot", {"output": str(output / f"{frame}-native.png"), "nativeOnly": True})
             check(f"{frame}: responsive viewport, trusted click and typing, unchanged Canvas/video", viewport=[width, height])
+            if frame.startswith("macbook"):
+                mcp.call("showtime_settings", canvas={"browserTheme": "dark"})
+                wait_viewport(width, height)
+                client.request("POST", "/v1/screenshot", {"output": str(output / f"{frame}-dark-film.png")})
+                client.request("POST", "/v1/studio/screenshot", {"output": str(output / f"{frame}-dark-native.png"), "nativeOnly": True})
+                check(f"{frame}: dark finish in native preview and export, unchanged viewport")
+
+        for legacy, replacement in [("iphone-se", "iphone-16-pro"), ("ipad-mini", "ipad-pro-11"), ("macbook", "macbook-neo")]:
+            settings = client.request("POST", "/v1/settings", {"canvas": {"frame": legacy}})
+            assert settings["canvas"]["frame"] == replacement
+            assert settings["canvas"]["width"] == 1920 and settings["canvas"]["height"] == 1080
+            assert settings["video"] == {"width": 1920, "height": 1080, "fps": 30}
+        check("Retired frame names migrate without losing Canvas or export settings")
 
         stable = client.request("GET", "/v1/settings")
         for invalid in ["unknown-phone", 42, None]:
@@ -133,13 +149,13 @@ def main():
         check("Portrait and minimum Canvas resize the phone viewport and preserve native input")
 
         mcp.call("showtime_settings", canvas={"width": 1920, "height": 1080}, video={"width": 1280, "height": 720, "fps": 24})
-        for frame in ["iphone-16-pro", "ipad-pro-11", "macbook", "macbook-pro"]:
+        for frame in ["iphone-16-pro", "ipad-pro-11", "macbook-neo", "macbook-pro"]:
             movie = output / f"{frame}.mp4"
             video_width, video_height = (3840, 2160) if frame.startswith("macbook") else (1280, 720)
             if frame.startswith("macbook"):
                 mcp.call("showtime_settings", canvas={"width": 3840, "height": 2160},
                          video={"width": video_width, "height": video_height, "fps": 24})
-            mcp.call("showtime_settings", canvas={"frame": frame})
+            mcp.call("showtime_settings", canvas={"frame": frame, "browserTheme": "light"})
             time.sleep(0.2)
             mcp.call("showtime_studio", mode="theater")
             mcp.call("showtime_record", operation="start", output=str(movie))

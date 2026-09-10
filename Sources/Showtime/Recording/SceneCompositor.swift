@@ -49,8 +49,7 @@ enum SceneCompositor {
         let layout = canvas.layout
         let screen = layout.canvasScreen, page = layout.canvasPage
         ctx.saveGState()
-        let outline = CGPath(roundedRect: screen, cornerWidth: layout.screenRadius * layout.scale,
-                             cornerHeight: layout.screenRadius * layout.scale, transform: nil)
+        let outline = layout.screenPath(in: screen)
         ctx.addPath(outline); ctx.clip()
         ctx.saveGState(); ctx.clip(to: page)
         ctx.translateBy(x: page.minX, y: page.minY)
@@ -84,7 +83,7 @@ enum SceneCompositor {
             let pixelScale = layout.scale * max(Double(width) / Double(c.width), Double(height) / Double(c.height))
             context.translateBy(x: layout.origin.x, y: layout.origin.y)
             context.scaleBy(x: layout.scale, y: layout.scale)
-            context.addPath(CGPath(roundedRect: layout.screen, cornerWidth: layout.screenRadius, cornerHeight: layout.screenRadius, transform: nil)); context.clip()
+            context.addPath(layout.screenPath(in: layout.screen)); context.clip()
             drawImage(try model.chromeImage(scale: pixelScale), in: CGRect(x: layout.screen.minX, y: layout.page.minY - CanvasSpec.chromeHeight,
                 width: layout.screen.width, height: CanvasSpec.chromeHeight), context: context)
         }
@@ -129,8 +128,7 @@ enum SceneCompositor {
             return CGPoint(x: x, y: y)
         }
         context.saveGState()
-        context.addPath(CGPath(roundedRect: screen, cornerWidth: layout.screenRadius * layout.scale,
-                               cornerHeight: layout.screenRadius * layout.scale, transform: nil)); context.clip()
+        context.addPath(layout.screenPath(in: screen)); context.clip()
         context.translateBy(x: page.minX, y: page.minY)
         context.clip(to: CGRect(origin: .zero, size: page.size))
         for pulse in effects.pulses {

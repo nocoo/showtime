@@ -6,7 +6,7 @@ Studio 使用原生 macOS 统一工具栏与红绿灯。默认窗口为 1872 × 
 
 1. 每次启动打开内置 Orbit 示例；在 Live preview 上方输入自己的地址，点击 Open。支持本地 `http://localhost:3000`、远程 HTTPS 网站和 `file://` 页面。查询参数原样保留，网站通过 WebKit 真实加载和交互。网址不在下次启动时恢复。
 2. Canvas 默认 1920 × 1080。在左侧 Canvas size 选择预设（最高 4K · 3840 × 2160），或输入宽高并按回车／应用按钮。None 框架的网页布局尺寸会减去 inset 和 56 px 浏览器顶栏；设备框架按比例适配 Canvas，网页视口使用实际屏幕区域。已有会话保留用户保存的尺寸。
-3. 在 Canvas 的 Backdrop 设置留白和背景，进入 Frame 选择设备及 Light／Dark 外观：Light 使用银色机身，Dark 使用深空黑，标题栏／状态栏同步切换。Browser identity 可覆盖浏览器顶栏的标题和地址；留空使用真实信息。接着在 Cursor 和 Text 设置鼠标及字幕效果。
+3. 在 Canvas 的 Backdrop 设置留白和背景，进入 Frame 选择设备及 Light／Dark 外观：Light 使用银色机身；Dark 在 MacBook Neo 上使用靛蓝色，其余设备使用深空黑，标题栏／状态栏同步切换。Browser identity 可覆盖浏览器顶栏的标题和地址；留空使用真实信息。接着在 Cursor 和 Text 设置鼠标及字幕效果。
 4. 最后进入 Export，在 Video export 选择输出分辨率与 24、30、60 fps。视频使用偶数像素，保持与 Canvas 相同的比例。修改 Canvas 自动适配输出；自定义视频比例不匹配会提示错误，保留原设置。设置会在下次启动恢复。
 5. 点击顶部 Record，直接录制当前页面；再次点击 Stop Take 完成 MP4。右上角绿色 LIVE 灯牌表示实时预览，录制时切换为红色 ON AIR。打开其他网站不会自动运行 Orbit。导入剧本后，Rehearse 负责排练，「Record storyboard」明确执行并录制整个剧本。
 
@@ -23,31 +23,38 @@ Frame 默认选中 None。设备只定义外观和屏幕比例，不限制内容
 | Frame / `canvas.frame` | 屏幕比例（宽:高） |
 | --- | --- |
 | None / `none` | 随 Canvas 变化 |
-| iPhone SE / `iphone-se` | 375:667 |
 | iPhone 16 Pro / `iphone-16-pro` | 201:437 |
 | iPhone 16 Pro Max / `iphone-16-pro-max` | 110:239 |
-| iPad mini / `ipad-mini` | 744:1133 |
 | iPad Pro 11″ / `ipad-pro-11` | 139:199 |
 | iPad Pro 13″ / `ipad-pro-13` | 3:4 |
-| MacBook 13″ / `macbook` | 16:10 |
-| MacBook Pro 16″ / `macbook-pro` | 16:10 |
+| MacBook Neo 13″（2026）/ `macbook-neo` | 2408:1506（约 16:10）|
+| MacBook Pro 16″（2026）/ `macbook-pro` | 16:10（无刘海） |
 
-MacBook Pro 使用 16 英寸无刘海外观，机身为新款平直底座、直边和小圆角，屏幕直接显示网页，不绘制浏览器顶栏，下边框显示 MacBook Pro。两款 MacBook 的标识使用常规字重 San Francisco，并按可见字形在下边框内水平、垂直居中。
+MacBook Neo 使用圆润的显示屏外壳、无刘海的 13 英寸屏幕和较薄的平直底座，保留浏览器顶栏。MacBook Pro 参考现款 16 英寸机身，使用更窄的边框与更厚的底座；按展示需要采用完整的 16:10 无刘海屏幕，不预留顶部空白，也不绘制浏览器顶栏。两款均有上圆下直的屏幕开口、正面开盖凹槽、铰链与脚垫，下边框为无字标玻璃。
 
-所有设备 Frame 共用 Light／Dark 设置（`canvas.browserTheme`）：Light 对应银色金属外壳，Dark 对应深空黑，侧键、金属边缘和 MacBook 底座一同切换，屏幕玻璃保持黑色。None 仍仅切换浏览器顶栏外观。预览和 PNG／MP4 使用同一套矢量绘制。
+所有设备 Frame 共用 Light／Dark 设置（`canvas.browserTheme`）：Light 对应银色金属外壳；Dark 在 Neo 上对应官方靛蓝色，其余设备对应深空黑。侧键、金属边缘和 MacBook 底座一同切换，屏幕玻璃保持黑色。None 仍仅切换浏览器顶栏外观。预览和 PNG／MP4 使用同一套原生矢量路径与屏幕裁剪。
 
-网页 CSS 视口随 Canvas 中的屏幕区域变化，可在 Frame 的 Web viewport 查看。Export 决定抓图像素密度：4K Canvas 配合 MacBook 与 4K Export 时，网页不受 1440 × 900 之类的参考绘图尺寸限制；较小 Canvas 也会按 4K 输出所需密度重新采样。网页直接由 WebKit 抓取，外框与字标按目标分辨率绘制，不使用缩小后的工作台预览作为素材。最终视频保持 Canvas 的宽高比，设备内容等比放入屏幕。
+网页 CSS 视口随 Canvas 中的屏幕区域变化，可在 Frame 的 Web viewport 查看。Export 决定抓图像素密度：4K Canvas 配合 MacBook 与 4K Export 时，网页不受参考绘图尺寸限制；较小 Canvas 也会按 4K 输出所需密度重新采样。网页直接由 WebKit 抓取，外框按目标分辨率绘制，不使用缩小后的工作台预览作为素材。最终视频保持 Canvas 的宽高比，设备内容等比放入屏幕。
+
+外观参考（核对日期：2026-09-10）：
+
+- MacBook Neo：[Apple 规格](https://www.apple.com/macbook-neo/specs/)、[官方正面图](https://www.apple.com/v/macbook-neo/c/images/specs/display__gjwmz6l3m262_large_2x.jpg)和[靛蓝机身图](https://www.apple.com/v/macbook-neo/c/images/overview/product-viewer/pv_colors_indigo__ee1m3vsakryq_large.jpg)。Neo 首代为 2026 款；未找到可靠的完整机身 SVG，轮廓按官方图片重绘。
+- MacBook Pro：[Apple 规格](https://www.apple.com/macbook-pro/specs/)、[官方 16 英寸正面图](https://www.apple.com/v/macbook-pro/specs/d/images/specs/16-inch/display_16_inch__bn4z91heotxy_large_2x.jpg)。参考 M5 Pro／Max 的 2026 款；官方图中的全屏视频在刘海周围留有黑边。
+- SVG 结构参考：[MacBook Pro M5](https://github.com/marvinhuelsmann/apple-guide/blob/b0e04111d39faeb980fea58b0e88db1024bbe5fe/public/devices/macbook-pro-14-m5.svg)和[16 英寸 Pro](https://github.com/marvinhuelsmann/apple-guide/blob/b0e04111d39faeb980fea58b0e88db1024bbe5fe/public/devices/macbook-pro-16-m4-pro.svg)，用于交叉核对金属边缘与正面凹槽。项目重绘 Core Graphics 路径，Pro 按展示要求采用无刘海的 16:10 屏幕；这些参考 SVG 未打包进 App。
 
 网页仍由 macOS WebKit 加载，保留真实鼠标和键盘事件，不模拟 iOS、触摸 API 或设备 User-Agent。网站是否提供移动布局由其自身实现决定。
 
 ```sh
 scripts/showtime settings --frame iphone-16-pro
 scripts/showtime inspect
+scripts/showtime settings --frame macbook-neo --browser-theme dark
 scripts/showtime settings --canvas 3840x2160 --frame macbook-pro --video 3840x2160
 scripts/showtime settings --frame none
 ```
 
 MCP 使用 `showtime_settings(canvas: {"frame": "iphone-16-pro"})`，JSON 剧本写入 `canvas.frame`。更改 Frame、Canvas 尺寸或 inset 后重新 inspect 获取目标位置；x/y 始终为未放大的网页 CSS 坐标。只调整 Export 分辨率不会改变页面布局。设置会保存；旧剧本未写 `frame` 时仍使用 None。拍摄期间不能切换设备。
+
+iPhone SE 和 iPad mini 已从设备选择、CLI 和 MCP 列表移除。载入旧设置或 JSON 时，`iphone-se` 迁移到 `iphone-16-pro`，`ipad-mini` 迁移到 `ipad-pro-11`，原 `macbook` 迁移到 `macbook-neo`；Canvas、留白、外观与导出配置保留，保存时写入新名称。未知设备名称仍会报错。
 
 ## Agent 接口
 

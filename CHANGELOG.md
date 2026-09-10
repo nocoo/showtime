@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Replace the generic MacBook and older Pro drawing with 2026 MacBook Neo and 16-inch MacBook Pro geometry, including updated screen proportions, rounded upper screen corners, sculpted front lips, feet, and an uninterrupted 16:10 Pro screen. Remove the old lower-bezel wordmarks and use indigo for the dark Neo finish.
+- Remove iPhone SE and iPad mini from Studio, CLI, and MCP choices. Migrate their saved names to iPhone 16 Pro and iPad Pro 11-inch, and `macbook` to `macbook-neo`, while preserving capture settings.
+
 ## [1.3.3] - 2026-09-10
 
 - Make LIVE and ON AIR prominent uppercase broadcast badges with a lit indicator and stronger contrast in both Studio themes.

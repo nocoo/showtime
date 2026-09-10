@@ -40,8 +40,8 @@ CANVAS_SETTINGS = schema({
     "height": {"type": "integer", "minimum": 500, "maximum": 2160},
     "inset": NUMBER,
     "backdrop": {"type": "string", "enum": ["mist", "pearl", "midnight"]},
-    "browserTheme": {"type": "string", "enum": ["light", "dark"], "description": "Frame appearance: light uses silver hardware, dark uses space black, with matching browser/status bars. Independent of Studio and webpage appearance."},
-    "frame": {"type": "string", "enum": ["none", "iphone-se", "iphone-16-pro", "iphone-16-pro-max", "ipad-mini", "ipad-pro-11", "ipad-pro-13", "macbook", "macbook-pro"],
+    "browserTheme": {"type": "string", "enum": ["light", "dark"], "description": "Frame appearance: light uses silver hardware; dark uses indigo on MacBook Neo and space black on other devices, with matching browser/status bars. Independent of Studio and webpage appearance."},
+    "frame": {"type": "string", "enum": ["none", "iphone-16-pro", "iphone-16-pro-max", "ipad-pro-11", "ipad-pro-13", "macbook-neo", "macbook-pro"],
               "description": "Default none. Frames define screen proportions and appearance; the webpage uses the fitted screen area on the Canvas and is captured at Export pixel density. Inspect again after changing frame, Canvas size, or inset for current CSS coordinates. This does not emulate iOS or touch input."},
 })
 VIDEO_SETTINGS = schema({
