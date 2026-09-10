@@ -54,7 +54,7 @@ def main():
     try:
         mcp.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "frame-check", "version": "1"}})
         mcp.call("showtime_studio", mode="studio", inspector="Frame", showInspector=True, theme="light")
-        mcp.call("showtime_settings", canvas={"width": 1920, "height": 1080, "inset": 32, "frame": "none", "browserTheme": "light"},
+        mcp.call("showtime_settings", canvas={"width": 1920, "height": 1080, "inset": 32, "frame": "none", "contentWidth": None, "browserTheme": "light"},
                  video={"width": 1920, "height": 1080, "fps": 30})
         mcp.call("showtime_open", url="showtime://demo")
         cases = [("none", 1856, 960, 1016), ("iphone-16-pro", 402, 790, 898),
@@ -96,6 +96,60 @@ def main():
             assert settings["canvas"]["width"] == 1920 and settings["canvas"]["height"] == 1080
             assert settings["video"] == {"width": 1920, "height": 1080, "fps": 30}
         check("Retired frame names migrate without losing Canvas or export settings")
+
+        mcp.call("showtime_settings", canvas={"width": 3840, "height": 2160, "inset": 160, "contentWidth": 2000, "frame": "none"},
+                 video={"width": 3840, "height": 2160, "fps": 24})
+        for frame, height in [("none", 2000 * (2160 - 56) / 3840), ("macbook-neo", 2000 * 697 / 1204), ("macbook-pro", 1250)]:
+            settings = mcp.call("showtime_settings", canvas={"frame": frame})
+            assert settings["canvas"]["contentWidth"] == 2000
+            assert settings["video"] == {"width": 3840, "height": 2160, "fps": 24}
+            wait_viewport(2000, height)
+            client.act({"action": "click", "selector": "#new-project", "duration": 0.1})
+            assert_page("!!document.querySelector('#project-name')")
+            client.act({"action": "key", "key": "escape"})
+            client.act({"action": "cursor", "visible": False})
+            client.request("POST", "/v1/screenshot", {"output": str(output / f"{frame}-width-2000.png")})
+        check("Fixed 2000 px content keeps device proportions, native input, and 4K export settings")
+
+        stable = client.request("GET", "/v1/settings")
+        for patch in [{"contentWidth": value} for value in [0, -1, 1.5, 3841]] + [{"frame": "iphone-16-pro"}, {"width": 1280, "height": 720}]:
+            try:
+                client.request("POST", "/v1/settings", {"canvas": patch})
+            except ShowtimeError:
+                pass
+            else:
+                raise AssertionError("An invalid fixed content width was accepted")
+            assert client.request("GET", "/v1/settings") == stable
+        check("Invalid widths and incompatible frame/Canvas changes leave all settings unchanged")
+
+        mcp.call("showtime_settings", canvas={"frame": "none", "inset": 0})
+        wait_viewport(2000, 2000 * (2160 - 56) / 3840)
+        evaluate("""(() => {
+          const layer = document.createElement('div'); layer.id='content-width-paint';
+          layer.style='position:fixed;inset:0;background:#d000ff;z-index:2147483647;pointer-events:none';
+          document.body.append(layer); return true;
+        })()""")
+        wide, narrow = output / "content-wide.png", output / "content-narrow.png"
+        client.request("POST", "/v1/screenshot", {"output": str(wide)})
+        mcp.call("showtime_settings", canvas={"contentWidth": 1000})
+        wait_viewport(1000, 1000 * (2160 - 56) / 3840)
+        client.request("POST", "/v1/screenshot", {"output": str(narrow)})
+        def sample(path):
+            return subprocess.check_output(["ffmpeg", "-v", "error", "-i", str(path), "-vf", "crop=1:1:1200:1080",
+                                            "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
+        before, after = sample(wide), sample(narrow)
+        assert before[0] > 180 and before[1] < 30 and before[2] > 220
+        assert after[1] > 150, "Shrinking content must replace the previous window and page with backdrop"
+        evaluate("(() => { document.querySelector('#content-width-paint').remove(); return true; })()")
+        check("Fixed width ignores inset and refreshes exported window geometry and margins")
+
+        for argument, expected in [("1200", 1200), ("auto", None)]:
+            settings = json.loads(subprocess.check_output([sys.executable, str(Path(__file__).with_name("showtime_cli.py")),
+                                                         "settings", "--content-width", argument]))
+            assert settings["canvas"]["contentWidth"] == expected
+        check("CLI sets a fixed content width and restores Auto")
+        mcp.call("showtime_settings", canvas={"width": 1920, "height": 1080, "inset": 32, "contentWidth": None},
+                 video={"width": 1920, "height": 1080, "fps": 30})
 
         stable = client.request("GET", "/v1/settings")
         for invalid in ["unknown-phone", 42, None]:
@@ -155,7 +209,7 @@ def main():
             if frame.startswith("macbook"):
                 mcp.call("showtime_settings", canvas={"width": 3840, "height": 2160},
                          video={"width": video_width, "height": video_height, "fps": 24})
-            mcp.call("showtime_settings", canvas={"frame": frame, "browserTheme": "light"})
+            mcp.call("showtime_settings", canvas={"frame": frame, "browserTheme": "light", "contentWidth": 2000 if frame.startswith("macbook") else None})
             time.sleep(0.2)
             mcp.call("showtime_studio", mode="theater")
             mcp.call("showtime_record", operation="start", output=str(movie))

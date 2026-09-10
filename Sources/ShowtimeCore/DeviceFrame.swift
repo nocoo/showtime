@@ -82,7 +82,9 @@ public struct FrameLayout: Sendable {
         let top: Double, bottom: Double
         switch frame {
         case .none:
-            size = CGSize(width: Double(canvas.width) - canvas.inset * 2, height: Double(canvas.height) - canvas.inset * 2)
+            // Custom width inherits the Canvas ratio; Auto preserves the existing inset layout.
+            let inset = canvas.contentWidth == nil ? canvas.inset : 0
+            size = CGSize(width: Double(canvas.width) - inset * 2, height: Double(canvas.height) - inset * 2)
             body = CGRect(origin: .zero, size: size)
             screen = body
             bodyRadius = 13; screenRadius = 13
@@ -118,8 +120,13 @@ public struct FrameLayout: Sendable {
             ? CGRect(x: 0, y: body.maxY - 6, width: size.width, height: frame == .macbookNeo ? 44 : 72)
             : .zero
         page = CGRect(x: screen.minX, y: screen.minY + top, width: screen.width, height: screen.height - top - bottom)
-        scale = min((Double(canvas.width) - canvas.inset * 2) / size.width,
-                    (Double(canvas.height) - canvas.inset * 2) / size.height)
+        if let contentWidth = canvas.contentWidth {
+            // Validation checks the full shell fits. Never silently shrink a requested width.
+            scale = Double(contentWidth) / screen.width
+        } else {
+            scale = min((Double(canvas.width) - canvas.inset * 2) / size.width,
+                        (Double(canvas.height) - canvas.inset * 2) / size.height)
+        }
         origin = CGPoint(x: (Double(canvas.width) - size.width * scale) / 2,
                          y: (Double(canvas.height) - size.height * scale) / 2)
     }

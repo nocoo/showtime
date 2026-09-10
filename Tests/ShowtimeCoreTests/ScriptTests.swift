@@ -151,6 +151,54 @@ final class ScriptTests {
         XCTAssertThrowsError(try canvas.validate())
     }
 
+    func testFixedContentWidthCentersAndValidatesFrames() throws {
+        var canvas = CanvasSpec()
+        canvas.width = 3840; canvas.height = 2160; canvas.inset = 160; canvas.contentWidth = 2000
+        try canvas.validate()
+        let screen = canvas.layout.canvasScreen
+        XCTAssertLessThanOrEqual(abs(screen.width - 2000), 0.001)
+        XCTAssertLessThanOrEqual(abs(screen.height - 1125), 0.001)
+        XCTAssertLessThanOrEqual(abs(screen.minX - 920), 0.001)
+        XCTAssertLessThanOrEqual(abs(screen.minY - 517.5), 0.001)
+        canvas.frame = .macbookPro
+        try canvas.validate()
+        XCTAssertLessThanOrEqual(abs(canvas.pageWidth - 2000), 0.001)
+        XCTAssertLessThanOrEqual(abs(canvas.pageHeight - 1250), 0.001)
+        let video = try RecordingSpec().fitted(to: canvas, longEdge: 3840)
+        XCTAssertEqual(video.width, 3840); XCTAssertEqual(video.height, 2160)
+
+        for frame in DeviceFrame.allCases {
+            canvas.frame = frame
+            let maximum = canvas.maximumContentWidth
+            canvas.contentWidth = maximum
+            try canvas.validate()
+            let layout = canvas.layout
+            XCTAssertLessThanOrEqual(abs(layout.canvasPage.width - Double(maximum)), 0.001)
+            let bounds = layout.onCanvas(CGRect(origin: .zero, size: layout.size))
+            XCTAssertGreaterThanOrEqual(bounds.minX, -0.001); XCTAssertGreaterThanOrEqual(bounds.minY, -0.001)
+            XCTAssertLessThanOrEqual(bounds.maxX, 3840.001); XCTAssertLessThanOrEqual(bounds.maxY, 2160.001)
+            XCTAssertLessThanOrEqual(abs(bounds.midX - 1920), 0.001)
+            XCTAssertLessThanOrEqual(abs(bounds.midY - 1080), 0.001)
+            canvas.inset = 0
+            XCTAssertEqual(canvas.layout.canvasScreen, layout.canvasScreen)
+            canvas.inset = 160
+            XCTAssertEqual(try JSONDecoder().decode(CanvasSpec.self, from: JSONEncoder().encode(canvas)), canvas)
+            for invalid in [0, -1, maximum + 1] {
+                canvas.contentWidth = invalid
+                XCTAssertThrowsError(try canvas.validate())
+            }
+        }
+        for json in [#"{}"#, #"{"contentWidth":null}"#] {
+            let automatic = try JSONDecoder().decode(CanvasSpec.self, from: Data(json.utf8))
+            XCTAssertNil(automatic.contentWidth)
+            XCTAssertEqual(automatic.layout.canvasPage, CGRect(x: 32, y: 88, width: 1856, height: 960))
+        }
+        XCTAssertThrowsError(try JSONDecoder().decode(CanvasSpec.self, from: Data(#"{"contentWidth":1200.5}"#.utf8)))
+        let migrated = try JSONDecoder().decode(CanvasSpec.self, from: Data(#"{"width":3840,"height":2160,"frame":"macbook","contentWidth":2000}"#.utf8))
+        try migrated.validate()
+        XCTAssertEqual(migrated.frame, .macbookNeo); XCTAssertEqual(migrated.contentWidth, 2000)
+    }
+
     func testParallelTracksCannotRaceForTheSameProperty() throws {
         let film = try script(#"{"steps":[{"action":"parallel","steps":[{"action":"zoom","scale":2},{"action":"zoom","scale":3}]}]}"#)
         XCTAssertThrowsError(try film.validate())

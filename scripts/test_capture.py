@@ -83,7 +83,7 @@ def main():
         assert opened["displayURL"] == actual_url and opened["displayTitle"] == opened["title"]
         check("A real website opens with its original identity and no implicit demo storyboard", url=actual_url)
 
-        mcp.call("showtime_settings", canvas={"width": 1440, "height": 810, "inset": 32, "browserTheme": "light", "frame": "none"},
+        mcp.call("showtime_settings", canvas={"width": 1440, "height": 810, "inset": 32, "browserTheme": "light", "frame": "none", "contentWidth": None},
                  video={"width": 1920, "height": 1080, "fps": 30})
         desktop = mcp.call("showtime_settings", canvas={"height": 900})
         assert desktop["video"] == {"width": 1920, "height": 1200, "fps": 30}
@@ -122,6 +122,8 @@ def main():
                 mcp.call("showtime_record", operation="start", output=str(movie))
             recording = client.status()
             assert recording["recording"] and not recording["playing"] and recording["url"] == actual_url
+            if index == 0:
+                client.request("POST", "/v1/studio/screenshot", {"output": str(output / "studio-recording.png")})
             try: client.request("POST", "/v1/settings", {"video": {"fps": 30}})
             except ShowtimeError as error: assert "409" in str(error)
             else: raise AssertionError("Settings changed during a take.")

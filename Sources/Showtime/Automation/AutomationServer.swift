@@ -227,7 +227,8 @@ final class AutomationServer {
             case ("POST", "/v1/settings"):
                 let object = try dictionary(request.body)
                 guard Set(object.keys).isSubset(of: ["canvas", "video"]) else { throw ShowtimeError("Capture settings accept canvas and video objects.") }
-                let canvas = try merged(model.canvas, patch: object["canvas"] ?? [:], allowed: ["width", "height", "inset", "backdrop", "browserTheme", "frame"])
+                let canvas = try merged(model.canvas, patch: object["canvas"] ?? [:],
+                                        allowed: ["width", "height", "inset", "backdrop", "browserTheme", "frame", "contentWidth"], nullable: ["contentWidth"])
                 let fitted = try model.recordingSettings.fitted(to: canvas)
                 let video = try merged(fitted, patch: object["video"] ?? [:], allowed: ["width", "height", "fps"])
                 try model.applyCapture(canvas: canvas, video: video)
@@ -283,13 +284,13 @@ final class AutomationServer {
         return object
     }
 
-    private func merged<T: Codable>(_ current: T, patch: Any, allowed: Set<String>) throws -> T {
+    private func merged<T: Codable>(_ current: T, patch: Any, allowed: Set<String>, nullable: Set<String> = []) throws -> T {
         guard let patch = patch as? [String: Any], Set(patch.keys).isSubset(of: allowed) else {
             throw ShowtimeError("Expected settings with these fields: \(allowed.sorted().joined(separator: ", ")).")
         }
         var object = try dictionary(JSONEncoder().encode(current))
         for (key, value) in patch {
-            guard !(value is NSNull) else { throw ShowtimeError("Setting \(key) cannot be null.") }
+            guard !(value is NSNull) || nullable.contains(key) else { throw ShowtimeError("Setting \(key) cannot be null.") }
             object[key] = value
         }
         return try JSONDecoder().decode(T.self, from: JSONSerialization.data(withJSONObject: object))

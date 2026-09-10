@@ -2,8 +2,12 @@
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-09-10
+
 - Replace the generic MacBook and older Pro drawing with 2026 MacBook Neo and 16-inch MacBook Pro geometry, including updated screen proportions, rounded upper screen corners, sculpted front lips, feet, and an uninterrupted 16:10 Pro screen. Remove the old lower-bezel wordmarks and use indigo for the dark Neo finish.
 - Remove iPhone SE and iPad mini from Studio, CLI, and MCP choices. Migrate their saved names to iPhone 16 Pro and iPad Pro 11-inch, and `macbook` to `macbook-neo`, while preserving capture settings.
+- Add Content width to Frame settings, scripts, CLI, and MCP. Set an exact inner screen width with a centered device and proportional height; None follows the Canvas ratio. Preserve existing layouts with Auto and keep export capture density independent of content size.
+- Show and validate the maximum content width against the full device and Canvas, reject sizes that do not fit, and apply inset only in Auto mode. Save the chosen width and include it in AI Director instructions.
 
 ## [1.3.3] - 2026-09-10
 

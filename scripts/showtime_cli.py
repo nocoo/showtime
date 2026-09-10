@@ -21,6 +21,18 @@ def dimensions(value):
         raise argparse.ArgumentTypeError("Use WIDTHxHEIGHT, for example 1920x1080") from exc
 
 
+def content_width(value):
+    if value.lower() == "auto":
+        return None
+    try:
+        width = int(value)
+        if width > 0:
+            return width
+    except ValueError:
+        pass
+    raise argparse.ArgumentTypeError("Use a positive whole number of pixels, or auto")
+
+
 def parser():
     root = argparse.ArgumentParser(prog="showtime", description="Direct real webpages. Make little films.")
     root.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
@@ -35,10 +47,12 @@ def parser():
     settings.add_argument("--canvas", type=dimensions, metavar="WIDTHxHEIGHT")
     settings.add_argument("--video", type=dimensions, metavar="WIDTHxHEIGHT")
     settings.add_argument("--fps", type=int, choices=[24, 30, 60])
-    settings.add_argument("--inset", type=float)
+    settings.add_argument("--inset", type=float, help="Canvas margin when content width is Auto")
+    settings.add_argument("--content-width", dest="contentWidth", type=content_width, default=argparse.SUPPRESS,
+                          metavar="PIXELS|auto", help="Screen width in Canvas pixels, excluding the frame; auto fits using inset")
     settings.add_argument("--backdrop", choices=["mist", "pearl", "midnight"])
     settings.add_argument("--frame", choices=["none", "iphone-16-pro", "iphone-16-pro-max", "ipad-pro-11", "ipad-pro-13", "macbook-neo", "macbook-pro"],
-                          help="Device proportions and appearance; page fits the Canvas and captures at Export resolution. Default: none")
+                          help="Device proportions and appearance; --content-width sets screen width. Default: none")
     settings.add_argument("--browser-theme", dest="browserTheme", choices=["light", "dark"], help="Frame appearance: light silver; dark indigo on MacBook Neo, space black on other devices; independent of Studio appearance")
     open_parser = commands.add_parser("open", help="Navigate to a URL (showtime://demo opens Orbit)")
     open_parser.add_argument("url")
@@ -98,6 +112,7 @@ def main(argv=None):
                 canvas, video = dict(args.canvas or {}), dict(args.video or {})
                 for key in ("inset", "backdrop", "browserTheme", "frame"):
                     if getattr(args, key) is not None: canvas[key] = getattr(args, key)
+                if hasattr(args, "contentWidth"): canvas["contentWidth"] = args.contentWidth
                 if args.fps is not None: video["fps"] = args.fps
                 body = {}
                 if canvas: body["canvas"] = canvas

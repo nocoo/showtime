@@ -9,6 +9,7 @@ struct InspectorView: View {
     @State private var captionSubtitle = "A little less busywork. A lot more momentum."
     @State private var captionStyle = "glass"
     @State private var captionPosition = "bottom"
+    @State private var contentWidth = ""
 
     var body: some View {
         VStack(spacing: 16) {
@@ -86,14 +87,19 @@ struct InspectorView: View {
                             .accessibilityAddTraits(model.canvas.backdrop == style ? [.isSelected] : [])
                     }
                 }
-                VStack(spacing: 9) {
-                    infoRow("Inset", value: "\(Int(model.canvas.inset)) px")
-                    Slider(value: Binding(get: { model.canvas.inset }, set: {
-                        var canvas = model.canvas; canvas.inset = $0.rounded()
-                        do { try model.applyCapture(canvas: canvas) }
-                        catch { model.report(error) }
-                    }), in: 0...model.canvas.maximumInset)
-                        .controlSize(.small).disabled(model.isBusy).accessibilityLabel("Canvas inset")
+                if model.canvas.contentWidth == nil {
+                    VStack(spacing: 9) {
+                        infoRow("Inset", value: "\(Int(model.canvas.inset)) px")
+                        Slider(value: Binding(get: { model.canvas.inset }, set: {
+                            var canvas = model.canvas; canvas.inset = $0.rounded()
+                            do { try model.applyCapture(canvas: canvas) }
+                            catch { model.report(error) }
+                        }), in: 0...model.canvas.maximumInset)
+                            .controlSize(.small).disabled(model.isBusy).accessibilityLabel("Canvas inset")
+                    }
+                } else {
+                    Text("Spacing is set by Content width in Frame.")
+                        .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 }
             }
             InspectorSection(title: "Browser identity", symbol: "globe") {
@@ -114,6 +120,32 @@ struct InspectorView: View {
 
     private var frameControls: some View {
         Group {
+            InspectorSection(title: "Content width", symbol: "arrow.left.and.right") {
+                HStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        TextField("Auto", text: $contentWidth)
+                            .textFieldStyle(.plain).font(.system(size: 13, design: .monospaced))
+                            .onSubmit(applyContentWidth).accessibilityLabel("Content width")
+                            .accessibilityHint("Screen width in Canvas pixels. Leave blank for Auto.")
+                        Text("px").font(.system(size: 11)).foregroundStyle(Theme.muted)
+                    }
+                    .padding(.horizontal, 11).frame(height: 38)
+                    .background(Theme.field, in: RoundedRectangle(cornerRadius: 11))
+                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Theme.line, lineWidth: 0.75))
+                    Button(action: applyContentWidth) {
+                        Image(systemName: "arrow.turn.down.left").font(.system(size: 13, weight: .medium)).frame(width: 12)
+                    }.buttonStyle(StudioButtonStyle()).help("Apply content width · Return")
+                        .accessibilityLabel("Apply content width")
+                    Button("Auto") { contentWidth = ""; applyContentWidth() }
+                        .buttonStyle(StudioButtonStyle()).help("Fit the frame automatically using Canvas inset")
+                        .accessibilityLabel("Automatic content width")
+                }
+                Text("Up to \(model.canvas.maximumContentWidth) px. Leave blank for Auto.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.muted)
+                infoRow("Web viewport", value: "\(Int(model.canvas.pageWidth)) × \(Int(model.canvas.pageHeight))")
+                Text("Screen width, excluding the frame. Height follows the device; None uses the Canvas ratio. The frame stays centered.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
+            }
             InspectorSection(title: "Device frame", symbol: "macbook.and.iphone") {
                 frameChoice(.none)
                 frameGroup("iPhone", devices: DeviceFrame.allCases.filter(\.isPhone))
@@ -121,10 +153,9 @@ struct InspectorView: View {
                 frameGroup("Mac", devices: DeviceFrame.allCases.filter(\.isMacBook))
             }
             InspectorSection(title: "Presentation", symbol: "rectangle.inset.filled") {
-                infoRow("Web viewport", value: "\(Int(model.canvas.pageWidth)) × \(Int(model.canvas.pageHeight))")
                 Text(model.canvas.frame == .none
-                     ? "A clean browser window, without a device frame."
-                     : "The page fills the screen area on your Canvas. Frames define proportions; Export controls image detail.")
+                     ? "A centered browser window, without a device frame."
+                     : "The page fills the screen at your content width. Export controls image detail.")
                     .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(model.canvas.frame == .none ? "Browser title bar" : "Frame appearance")
@@ -147,6 +178,27 @@ struct InspectorView: View {
                 }
             }
         }.disabled(model.isBusy)
+            .onAppear(perform: syncContentWidth)
+            .onChange(of: model.canvas.contentWidth) { syncContentWidth() }
+    }
+
+    private func applyContentWidth() {
+        let value = contentWidth.trimmingCharacters(in: .whitespacesAndNewlines)
+        var canvas = model.canvas
+        if value.isEmpty || value.lowercased() == "auto" {
+            canvas.contentWidth = nil
+        } else {
+            guard let width = Int(value) else {
+                model.report(ShowtimeError("Enter a whole number for content width, or use Auto.")); return
+            }
+            canvas.contentWidth = width
+        }
+        do { try model.applyCapture(canvas: canvas); syncContentWidth() }
+        catch { model.report(error) }
+    }
+
+    private func syncContentWidth() {
+        contentWidth = model.canvas.contentWidth.map(String.init) ?? ""
     }
 
     private func frameGroup(_ title: String, devices: [DeviceFrame]) -> some View {

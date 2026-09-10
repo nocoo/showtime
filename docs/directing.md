@@ -7,7 +7,7 @@ Showtime 的主要操作方式是让 Agent 导演真实网页。用户在 AI Dir
 在 Studio 打开目标网站，先在 Canvas 设置画面，在 Frame 选择可选设备，在 Cursor 和 Text 预览鼠标与字幕，再在 Export 确认视频尺寸和帧率。进入 AI Director，填写网站地址、要突出展示的流程，以及 30／45／60 秒的目标片长。右侧示意图展示 Agent → Showtime → 视频的关系；下方「Copy instructions for your agent」会复制包括以下内容的一整份任务：
 
 - 用户目录中的固定 CLI / MCP 入口，自动读取 App 的本机连接信息，不依赖源码或 App 的安装路径。
-- 网站、创意简报、目标片长、输出目录，以及当前 Canvas、设备 Frame、网页视口、顶栏主题、视频分辨率和帧率。
+- 网站、创意简报、目标片长、输出目录，以及当前 Canvas、设备 Frame、Content width、网页视口、顶栏主题、视频分辨率和帧率。
 - 先检查网页、编写有场景和动作名称的剧本、排练、检查截图、正式拍摄、验证导出的步骤。
 
 把整份任务贴给有终端或 MCP 能力的 Agent 即可。保持 Showtime 打开，在 Theater 观察。任务不会要求用户复制 Bearer token；「Connection details」还提供单独的 MCP 配置和 CLI 连接命令。

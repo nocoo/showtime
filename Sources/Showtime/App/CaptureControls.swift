@@ -62,7 +62,7 @@ struct CaptureControls: View {
                         customCanvas = true
                         applyCanvas(width: width, height: height)
                     }
-                    Text("The final composition size, up to 3840 × 2160. Frames fit this Canvas; Export controls the capture detail and video resolution.")
+                    Text("The final composition size, up to 3840 × 2160. Set Content width in Frame to control spacing; Export controls image detail and video resolution.")
                         .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 }
             } else {

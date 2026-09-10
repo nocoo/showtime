@@ -51,6 +51,8 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
     public var backdrop: String = "mist"
     public var browserTheme: String = "light"
     public var frame: DeviceFrame = .none
+    /// Screen width in Canvas pixels, excluding hardware. nil keeps automatic fitting.
+    public var contentWidth: Int?
     public static let chromeHeight: Double = 56
 
     public init() {}
@@ -63,6 +65,7 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
         backdrop = try c.decodeIfPresent(String.self, forKey: .backdrop) ?? "mist"
         browserTheme = try c.decodeIfPresent(String.self, forKey: .browserTheme) ?? "light"
         frame = try c.decodeIfPresent(DeviceFrame.self, forKey: .frame) ?? .none
+        contentWidth = try c.decodeIfPresent(Int.self, forKey: .contentWidth)
     }
 
     public var layout: FrameLayout { FrameLayout(canvas: self) }
@@ -72,6 +75,12 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
         max(0, min(160, Double(width - (frame == .none ? 600 : 320)) / 2,
                    (Double(height) - (frame == .none ? 300 + Self.chromeHeight : 320)) / 2))
     }
+    public var maximumContentWidth: Int {
+        var available = self
+        available.contentWidth = nil
+        available.inset = 0
+        return Int(available.layout.canvasScreen.width.rounded(.down))
+    }
 
     public func validate() throws {
         guard (800...3840).contains(width), (500...2160).contains(height) else {
@@ -79,6 +88,9 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
         }
         guard inset.isFinite, (0...maximumInset).contains(inset) else {
             throw ShowtimeError("Canvas inset leaves too little room for the browser.")
+        }
+        if let contentWidth, !(1...maximumContentWidth).contains(contentWidth) {
+            throw ShowtimeError("Content width must be between 1 and \(maximumContentWidth) px for \(frame.title) on a \(width) × \(height) Canvas. Use Auto to fit the frame automatically.")
         }
         guard ["mist", "pearl", "midnight"].contains(backdrop) else {
             throw ShowtimeError("Unknown backdrop. Use mist, pearl, or midnight.")

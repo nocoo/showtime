@@ -146,7 +146,8 @@ final class StudioModel: ObservableObject {
          "showInspector": showInspector, "theater": theaterMode]
     }
     var captureState: [String: Any] {
-        ["canvas": ["width": canvas.width, "height": canvas.height, "inset": canvas.inset, "backdrop": canvas.backdrop, "browserTheme": canvas.browserTheme, "frame": canvas.frame.rawValue],
+        ["canvas": ["width": canvas.width, "height": canvas.height, "inset": canvas.inset, "backdrop": canvas.backdrop,
+                    "browserTheme": canvas.browserTheme, "frame": canvas.frame.rawValue, "contentWidth": canvas.contentWidth as Any? ?? NSNull()],
          "video": ["width": recordingSettings.width, "height": recordingSettings.height, "fps": recordingSettings.fps]]
     }
     var pageSize: CGSize { CGSize(width: canvas.pageWidth, height: canvas.pageHeight) }
@@ -320,7 +321,8 @@ final class StudioModel: ObservableObject {
     }
 
     private func updateCanvas(_ nextCanvas: CanvasSpec) {
-        let resized = nextCanvas.width != canvas.width || nextCanvas.height != canvas.height || nextCanvas.inset != canvas.inset || nextCanvas.frame != canvas.frame
+        let resized = nextCanvas.width != canvas.width || nextCanvas.height != canvas.height || nextCanvas.inset != canvas.inset
+            || nextCanvas.frame != canvas.frame || nextCanvas.contentWidth != canvas.contentWidth
         canvas = nextCanvas
         if resized {
             effects.camera = CameraState(scale: 1, focus: CGPoint(x: nextCanvas.pageWidth / 2, y: nextCanvas.pageHeight / 2))
