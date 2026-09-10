@@ -1,5 +1,4 @@
 import AppKit
-import CoreText
 import ShowtimeCore
 
 /// Vector hardware stays sharp at every export resolution. The live preview
@@ -9,6 +8,7 @@ enum DeviceFrameRenderer {
     static func draw(canvas: CanvasSpec, context ctx: CGContext) {
         let layout = canvas.layout, frame = canvas.frame
         let dark = canvas.browserTheme == "dark"
+        let indigo = dark && frame == .macbookNeo
         ctx.saveGState()
         defer { ctx.restoreGState() }
         ctx.translateBy(x: layout.origin.x, y: layout.origin.y)
@@ -23,10 +23,11 @@ enum DeviceFrameRenderer {
         if frame == .none { return }
 
         // A narrow machined rim, a reflected edge, then dark cover glass.
-        gradient(outline, rect: body, colors: dark
+        gradient(outline, rect: body, colors: indigo
+                 ? ["#8995AB", "#44516A", "#79879F", "#354159"] : dark
                  ? ["#55585B", "#25272A", "#44474A", "#16181A"]
                  : ["#D6D8DA", "#929699", "#E1E3E4", "#8C9094"], context: ctx)
-        stroke(rounded(body.insetBy(dx: 1, dy: 1), layout.bodyRadius - 1), dark ? "#686B6E" : "#F5F6F6", width: 0.9, alpha: 0.7, ctx)
+        stroke(rounded(body.insetBy(dx: 1, dy: 1), layout.bodyRadius - 1), indigo ? "#A0ACC0" : dark ? "#686B6E" : "#F5F6F6", width: 0.9, alpha: 0.7, ctx)
         fill(rounded(body.insetBy(dx: 3.2, dy: 3.2), layout.bodyRadius - 3.2), "#111315", ctx)
         stroke(rounded(body.insetBy(dx: 5, dy: 5), layout.bodyRadius - 5), dark ? "#292B2E" : "#434648", width: 0.7, ctx)
 
@@ -40,45 +41,34 @@ enum DeviceFrameRenderer {
             fill(rounded(CGRect(x: body.maxX - 0.5, y: buttonY + 61, width: 3, height: frame.isPhone ? 68 : 38), 1.4), buttonColor, ctx)
         }
 
-        let surface = dark ? "#242B28" : "#FCFDFB"
-        fill(rounded(screen, layout.screenRadius), surface, ctx)
-        stroke(rounded(screen.insetBy(dx: -0.6, dy: -0.6), layout.screenRadius + 0.6), "#000000", width: 1.2, ctx)
+        let surface = frame.isMacBook ? (dark ? "#25272B" : "#E8EAED") : (dark ? "#242B28" : "#FCFDFB")
+        fill(layout.screenPath(in: screen), surface, ctx)
+        stroke(layout.screenPath(in: screen), "#000000", width: 1.2, ctx)
 
         if frame.isPhone || frame.isTablet {
             statusBar(frame: frame, screen: screen, dark: dark, context: ctx)
-            if frame == .iphoneSE {
-                fill(rounded(CGRect(x: body.midX - 29, y: 54, width: 58, height: 6), 3), "#050607", ctx)
-                lens(at: CGPoint(x: body.midX - 59, y: 57), radius: 5, context: ctx)
-                let home = CGRect(x: body.midX - 31, y: screen.maxY + 25, width: 62, height: 62)
-                gradient(rounded(home, 31), rect: home, colors: dark
-                         ? ["#4B4E51", "#202225", "#56595C"]
-                         : ["#C7CBCE", "#6F7478", "#E2E5E7"], context: ctx)
-                fill(rounded(home.insetBy(dx: 2, dy: 2), 29), "#101214", ctx)
+            if frame.isPhone {
+                let island = CGRect(x: screen.midX - 57, y: screen.minY + 10, width: 114, height: 32)
+                fill(rounded(island, 16), "#08090B", ctx)
+                lens(at: CGPoint(x: island.maxX - 16, y: island.midY), radius: 4.2, context: ctx)
             } else {
-                if frame.isPhone {
-                    let island = CGRect(x: screen.midX - 57, y: screen.minY + 10, width: 114, height: 32)
-                    fill(rounded(island, 16), "#08090B", ctx)
-                    lens(at: CGPoint(x: island.maxX - 16, y: island.midY), radius: 4.2, context: ctx)
-                } else {
-                    lens(at: CGPoint(x: body.midX, y: screen.minY / 2), radius: 3.8, context: ctx)
-                }
-                let homeWidth: Double = frame.isPhone ? 120 : 160
-                fill(rounded(CGRect(x: screen.midX - homeWidth / 2, y: screen.maxY - 12,
-                                    width: homeWidth, height: frame.isPhone ? 5 : 4), 2.5), dark ? "#DFE5E0" : "#202522", ctx)
+                lens(at: CGPoint(x: body.midX, y: screen.minY / 2), radius: 3.8, context: ctx)
             }
+            let homeWidth: Double = frame.isPhone ? 120 : 160
+            fill(rounded(CGRect(x: screen.midX - homeWidth / 2, y: screen.maxY - 12,
+                                width: homeWidth, height: frame.isPhone ? 5 : 4), 2.5), dark ? "#DFE5E0" : "#202522", ctx)
         } else if frame.isMacBook {
-            let base = CGRect(x: 0, y: body.maxY - 8, width: layout.size.width, height: frame == .macbookPro ? 26 : 34)
-            lens(at: CGPoint(x: body.midX, y: screen.minY / 2), radius: 2.6, context: ctx)
-            macbookWordmark(frame == .macbookPro ? "MacBook Pro" : "MacBook",
-                            in: CGRect(x: screen.minX, y: screen.maxY, width: screen.width,
-                                       height: base.minY - screen.maxY), context: ctx)
-            macbookBase(rect: base, pro: frame == .macbookPro, dark: dark, context: ctx)
+            lens(at: CGPoint(x: body.midX, y: screen.minY / 2), radius: 3.2, context: ctx)
+            // Current models have plain glass below the display, with a recessed hinge.
+            let hinge = CGRect(x: body.minX + 24, y: layout.base.minY - 14, width: body.width - 48, height: 14)
+            gradient(rounded(hinge, 7), rect: hinge, colors: ["#1D1E20", "#070809"], vertical: true, context: ctx)
+            macbookBase(rect: layout.base, neo: frame == .macbookNeo, dark: dark, context: ctx)
         }
     }
 
     private static func statusBar(frame: DeviceFrame, screen: CGRect, dark: Bool, context ctx: CGContext) {
         let ink = dark ? "#E7EDE8" : "#222724"
-        let compact = frame == .iphoneSE || frame.isTablet
+        let compact = frame.isTablet
         let y = screen.minY + (compact ? 4 : 19)
         let margin: Double = frame.isPhone && !compact ? 27 : 16
         label("9:41", rect: CGRect(x: screen.minX + margin, y: y - 1, width: 50, height: 20),
@@ -103,54 +93,41 @@ enum DeviceFrameRenderer {
         ctx.restoreGState()
     }
 
-    private static func macbookWordmark(_ title: String, in rect: CGRect, context ctx: CGContext) {
-        let text = NSAttributedString(string: title, attributes: [
-            .font: NSFont.systemFont(ofSize: 13, weight: .regular),
-            .foregroundColor: SceneCompositor.color("#A2A5A7"),
-        ])
-        let line = CTLineCreateWithAttributedString(text as CFAttributedString)
-        // Center the visible San Francisco glyphs, excluding the font's line leading.
-        let bounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+    private static func macbookBase(rect base: CGRect, neo: Bool, dark: Bool, context ctx: CGContext) {
+        // Front-view proportions follow Apple's 2026 product photography; see docs/studio.md.
+        let indigo = neo && dark
+        for x in [base.width * 0.044, base.width * 0.901] {
+            let foot = CGRect(x: x, y: base.maxY - 4, width: base.width * 0.055, height: 16)
+            fill(rounded(foot, 8), indigo ? "#3C485F" : dark ? "#1B1D1F" : "#A7A9AB", ctx)
+        }
+        let path = roundedBottom(base.insetBy(dx: 1, dy: 0), neo ? 14 : 24)
         ctx.saveGState()
-        ctx.translateBy(x: rect.midX - bounds.midX, y: rect.midY + bounds.midY)
-        ctx.scaleBy(x: 1, y: -1)
-        ctx.textMatrix = .identity
-        ctx.textPosition = .zero
-        CTLineDraw(line, ctx)
+        ctx.setShadow(offset: CGSize(width: 0, height: 6), blur: 12, color: NSColor.black.withAlphaComponent(0.22).cgColor)
+        fill(path, indigo ? "#44516A" : dark ? "#2D2F32" : "#B8BBBD", ctx)
         ctx.restoreGState()
+        gradient(path, rect: base, colors: indigo
+                 ? ["#8794AA", "#64738D", "#52617B", "#3D4B63", "#64728B"] : dark
+                 ? ["#777A7E", "#53565A", "#43464A", "#2A2D31", "#494C50"]
+                 : ["#F0F1F3", "#D7D9DD", "#C6C9CE", "#A7ABB1", "#D3D5D9"], vertical: true, context: ctx)
+        stroke(path, indigo ? "#344159" : dark ? "#202226" : "#989CA2", width: 0.9, ctx)
+        let gripWidth = base.width * (neo ? 0.18 : 0.153)
+        let grip = CGRect(x: base.midX - gripWidth / 2, y: base.minY, width: gripWidth, height: neo ? 20 : 24)
+        gradient(roundedBottom(grip, neo ? 15 : 18), rect: grip, colors: indigo
+                 ? ["#27354D", "#5F6E87", "#8E9AB0"] : dark
+                 ? ["#191B1E", "#4D5055", "#75787C"]
+                 : ["#777D85", "#C9CDD2", "#EBEDF0"], vertical: true, context: ctx)
     }
 
-    private static func macbookBase(rect base: CGRect, pro: Bool, dark: Bool, context ctx: CGContext) {
+    private static func roundedBottom(_ rect: CGRect, _ radius: Double) -> CGPath {
         let path = CGMutablePath()
-        if pro {
-            // The modern Pro has a flat front face and short, nearly square corners.
-            path.addPath(rounded(base.insetBy(dx: 1, dy: 0), 4))
-        } else {
-            path.move(to: CGPoint(x: 1, y: base.minY))
-            path.addLine(to: CGPoint(x: base.maxX - 1, y: base.minY))
-            path.addLine(to: CGPoint(x: base.maxX - 5, y: base.midY))
-            path.addQuadCurve(to: CGPoint(x: base.maxX - 46, y: base.maxY), control: CGPoint(x: base.maxX - 17, y: base.maxY))
-            path.addLine(to: CGPoint(x: 46, y: base.maxY))
-            path.addQuadCurve(to: CGPoint(x: 5, y: base.midY), control: CGPoint(x: 17, y: base.maxY))
-            path.closeSubpath()
-        }
-        ctx.saveGState()
-        ctx.setShadow(offset: CGSize(width: 0, height: 6), blur: 12, color: NSColor.black.withAlphaComponent(0.24).cgColor)
-        fill(path, dark ? "#2D2F32" : "#B8BBBD", ctx)
-        ctx.restoreGState()
-        gradient(path, rect: base, colors: dark
-                 ? ["#45474A", "#303235", "#27292C"]
-                 : ["#E1E3E4", "#C3C6C8", "#A9ADB0"], vertical: true, context: ctx)
-        stroke(path, dark ? "#1B1D1F" : "#909598", width: 0.9, ctx)
-        ctx.setStrokeColor(SceneCompositor.color(dark ? "#636669" : "#F3F4F5").cgColor); ctx.setLineWidth(1.3)
-        ctx.move(to: CGPoint(x: 5, y: base.minY + 1)); ctx.addLine(to: CGPoint(x: base.maxX - 5, y: base.minY + 1)); ctx.strokePath()
-        let grip = CGRect(x: base.midX - 94, y: base.minY, width: 188, height: pro ? 6 : 10)
-        gradient(rounded(grip, pro ? 2 : 5), rect: grip, colors: dark
-                 ? ["#17191B", "#383B3E"] : ["#93999D", "#C9CDD0"], vertical: true, context: ctx)
-        let bottom = pro
-            ? CGRect(x: 5, y: base.maxY - 1.5, width: base.width - 10, height: 1)
-            : CGRect(x: 47, y: base.maxY, width: base.width - 94, height: 3)
-        fill(rounded(bottom, pro ? 0.5 : 1.5), dark ? "#151719" : "#3B4044", ctx)
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX - radius, y: rect.maxY), control: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY - radius), control: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 
     private static func lens(at center: CGPoint, radius: Double, context ctx: CGContext) {
