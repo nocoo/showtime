@@ -12,16 +12,21 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
     private(set) var ready = false
     private var navigationError: Error?
     private var snapshotTask: Task<CGImage, Error>?
+    private var faviconTask: Task<Void, Never>?
+    private var faviconNavigation = UUID()
 
     override init() {
         let config = WKWebViewConfiguration()
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.websiteDataStore = .default()
         config.mediaTypesRequiringUserActionForPlayback = []
-        webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1376, height: 670), configuration: config)
+        webView = WKWebView(frame: CGRect(x: 0, y: 0, width: CanvasSpec().pageWidth, height: CanvasSpec().pageHeight), configuration: config)
         super.init()
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        // Studio appearance is a workspace preference, not a change to the film.
+        // Websites can still provide their own independent theme controls.
+        webView.appearance = NSAppearance(named: .aqua)
         webView.allowsBackForwardNavigationGestures = true
         webView.isInspectable = true
         webView.underPageBackgroundColor = .white
@@ -77,12 +82,43 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         ready = false
         navigationError = nil
+        faviconNavigation = UUID()
+        faviconTask?.cancel()
+        owner?.favicon = nil
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         ready = true
         owner?.actualTitle = webView.title ?? "Untitled"
         owner?.actualURL = webView.url?.absoluteString ?? ""
+        loadFavicon()
+        if let owner, let url = webView.url, ["http", "https", "file"].contains(url.scheme ?? ""),
+           !url.absoluteString.hasPrefix(owner.demoURL.absoluteString) {
+            UserDefaults.standard.set(url.absoluteString, forKey: "lastWebsite")
+        }
+    }
+
+    private func loadFavicon() {
+        guard let pageURL = webView.url else { return }
+        let navigation = faviconNavigation
+        faviconTask?.cancel()
+        faviconTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let links = (try? await self.evaluate("""
+            (() => {
+              const links = [...document.querySelectorAll('link[rel]')]
+                .filter(link => (!link.media || matchMedia(link.media).matches) &&
+                  (link.rel.toLowerCase().split(/\\s+/).includes('icon') || link.rel.toLowerCase() === 'apple-touch-icon'));
+              links.sort((a, b) => Number(a.rel.toLowerCase() === 'apple-touch-icon') - Number(b.rel.toLowerCase() === 'apple-touch-icon'));
+              return [...new Set(links.map(link => link.href))].slice(0, 6);
+            })()
+            """)) as? [String] ?? []
+            guard !Task.isCancelled, self.faviconNavigation == navigation else { return }
+            let image = await SiteFavicon.load(links: links, pageURL: pageURL)
+            guard !Task.isCancelled, self.faviconNavigation == navigation else { return }
+            self.owner?.favicon = image
+            self.faviconTask = nil
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { failed(error) }

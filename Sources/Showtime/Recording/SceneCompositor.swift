@@ -47,7 +47,7 @@ enum SceneCompositor {
 
     private static func browserBackdrop(model: StudioModel, width: Int, height: Int) throws -> CGImage {
         let c = model.canvas
-        let key = "\(width):\(height):\(c.width):\(c.height):\(c.inset):\(c.backdrop):\(model.displayTitle):\(model.displayURL):\(model.canGoBack):\(model.canGoForward)"
+        let key = "\(width):\(height):\(c.width):\(c.height):\(c.inset):\(c.backdrop):\(c.browserTheme):\(model.displayTitle):\(model.displayURL):\(model.faviconRevision)"
         if let cache = backdropCache, cache.key == key { return cache.image }
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {

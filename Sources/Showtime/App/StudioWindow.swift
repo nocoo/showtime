@@ -5,7 +5,22 @@ import ShowtimeCore
 /// Accessibility or Screen Recording permission. No window controls are redrawn.
 @MainActor
 enum StudioWindow {
+    static let launchSize = CGSize(width: 1872, height: 1248)
+    private static weak var placedWindow: NSWindow?
     private static var transition: FullScreenTransition?
+
+    static func placeOnLaunch(_ window: NSWindow) {
+        guard placedWindow !== window,
+              let screen = window.screen ?? NSScreen.main else { return }
+        placedWindow = window
+        let visible = screen.visibleFrame
+        let size = CGSize(width: min(launchSize.width, visible.width), height: min(launchSize.height, visible.height))
+        let frame = CGRect(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2,
+                           width: size.width, height: size.height)
+        // Place once. Theme, sidebar, and toolbar updates must never move or
+        // resize a window the user has already arranged.
+        window.setFrame(frame, display: false)
+    }
 
     static func observe(_ window: NSWindow) {
         guard transition?.window !== window else { return }
@@ -71,24 +86,45 @@ enum StudioWindow {
             frame.origin.x = max(screen.minX, min(frame.minX, screen.maxX - size.width))
             frame.origin.y = max(screen.minY, min(frame.minY, screen.maxY - size.height))
             window.setFrame(frame, display: true)
+        case "click":
+            guard !window.isMiniaturized,
+                  let x = request["x"] as? Double, let y = request["y"] as? Double,
+                  x.isFinite, y.isFinite, (0..<window.frame.width).contains(x), (0..<window.frame.height).contains(y) else {
+                throw ShowtimeError("Click coordinates must be inside the visible window, in AppKit points.")
+            }
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            try click(at: CGPoint(x: x, y: y), count: 1, in: window)
         case "doubleClickTitlebar":
             guard !window.styleMask.contains(.fullScreen), !window.isMiniaturized else {
                 throw ShowtimeError("Restore the window before double-clicking the titlebar.")
             }
-            // This lands in the native draggable strip above toolbar items. Let
-            // AppKit apply the user's double-click preference (Fill/Zoom/Minimize).
-            let point = CGPoint(x: window.frame.width / 2, y: window.frame.height - 4)
-            let time = ProcessInfo.processInfo.systemUptime
-            guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: time,
-                                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 2, pressure: 1),
-                  let up = NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [], timestamp: time + 0.02,
-                                             windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 2, pressure: 0) else {
-                throw ShowtimeError("Could not create a titlebar mouse event.")
-            }
-            NSApp.postEvent(down, atStart: false)
-            NSApp.postEvent(up, atStart: false)
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            // Use the native gap between the wordmark and workspace tabs. The
+            // top few pixels belong to the window's resize edge after full screen.
+            // AppKit applies the user's double-click preference (Fill/Zoom/Minimize).
+            let point = CGPoint(x: window.frame.width * 0.3, y: window.frame.height - 26)
+            try click(at: point, count: 2, in: window)
         default:
-            throw ShowtimeError("Window action must be zoom, minimize, restore, fullscreen, resize, or doubleClickTitlebar.")
+            throw ShowtimeError("Window action must be zoom, minimize, restore, fullscreen, resize, click, or doubleClickTitlebar.")
+        }
+    }
+
+    private static func click(at point: CGPoint, count: Int, in window: NSWindow) throws {
+        let time = ProcessInfo.processInfo.systemUptime
+        for index in 1...count {
+            let delay = Double(index - 1) * 0.1
+            guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [], timestamp: time + delay,
+                                               windowNumber: window.windowNumber, context: nil, eventNumber: index * 2, clickCount: index, pressure: 1),
+                  let up = NSEvent.mouseEvent(with: .leftMouseUp, location: point, modifierFlags: [], timestamp: time + delay + 0.02,
+                                             windowNumber: window.windowNumber, context: nil, eventNumber: index * 2 + 1, clickCount: index, pressure: 0) else {
+                throw ShowtimeError("Could not create a window mouse event.")
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                NSApp.postEvent(down, atStart: false)
+                NSApp.postEvent(up, atStart: false)
+            }
         }
     }
 

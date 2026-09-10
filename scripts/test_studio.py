@@ -124,6 +124,8 @@ def main():
         screenshot("cursor")
         client.request("POST", "/v1/studio", {"inspector": "Text"})
         screenshot("text")
+        client.request("POST", "/v1/studio", {"inspector": "Export"})
+        screenshot("export")
         minimum = baseline["minimumSize"]
         action("resize", width=minimum["width"], height=minimum["height"])
         wait_for(lambda state: state["frame"]["width"] == minimum["width"] and state["frame"]["height"] == minimum["height"],
@@ -145,8 +147,7 @@ def main():
         action("restore")
         wait_for(normal, "Restored after checks")
         action("resize", width=original["frame"]["width"], height=original["frame"]["height"])
-        client.request("POST", "/v1/studio", {"inspector": previous_studio["inspector"],
-                       "showInspector": previous_studio["showInspector"], "theater": previous_studio.get("theater", False)})
+        client.request("POST", "/v1/studio", previous_studio)
         (output / "window-results.json").write_text(json.dumps(results, indent=2) + "\n")
     print("Studio artifacts: " + str(output), flush=True)
 

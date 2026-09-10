@@ -18,4 +18,11 @@ jobs:
       - name: Check version, core behavior, and script syntax
         run: scripts/test.sh
       - name: Build the native app
+        # Hosted CI has no personal Apple certificates. This is a build check,
+        # not an artifact signed for public distribution.
+        env:
+          CODE_SIGN_IDENTITY: "-"
+          SHOWTIME_ARCH: universal
         run: scripts/build.sh release
+      - name: Verify app archive and bundled agent tools
+        run: python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview

@@ -15,4 +15,13 @@ enum AppResources {
         }
         return image
     }()
+
+    static let directorBrowser: NSImage = {
+        guard let url = bundle.url(forResource: "DirectorBrowser", withExtension: "svg"),
+              let image = NSImage(contentsOf: url) else {
+            fatalError("The director browser illustration is missing from the application resources.")
+        }
+        image.isTemplate = true
+        return image
+    }()
 }

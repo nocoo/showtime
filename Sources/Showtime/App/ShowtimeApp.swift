@@ -9,7 +9,8 @@ struct ShowtimeApp: App {
     var body: some Scene {
         Window("Showtime", id: "studio") {
             StudioView(model: model)
-                .environment(\.colorScheme, .light)
+                .preferredColorScheme(model.appearance.colorScheme)
+                .environment(\.colorScheme, model.appearance.colorScheme)
                 .frame(minWidth: 1120, minHeight: 760)
                 .background(WindowAccessor { window in
                     model.window = window
@@ -19,16 +20,18 @@ struct ShowtimeApp: App {
                     // Keep the real AppKit titlebar and its native drag, double-click,
                     // traffic-light, tiling, and full-screen behavior.
                     window.titlebarSeparatorStyle = .none
+                    window.appearance = model.appearance.native
                     window.isMovableByWindowBackground = false
                     window.backgroundColor = NSColor(Theme.surface)
                     window.acceptsMouseMovedEvents = true
                     window.tabbingMode = .disallowed
+                    StudioWindow.placeOnLaunch(window)
                 })
                 .task { delegate.model = model; model.start() }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
-        .defaultSize(width: 1560, height: 1040)
+        .defaultSize(width: StudioWindow.launchSize.width, height: StudioWindow.launchSize.height)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -43,14 +46,19 @@ struct ShowtimeApp: App {
                 Button("Open Orbit Demo") { model.navigate("showtime://demo") }
             }
             CommandMenu("Director") {
-                Button("Rehearse") { model.playDemo(record: false) }.keyboardShortcut(.return, modifiers: .command).disabled(model.isBusy)
-                Button("Record Film") { model.playDemo(record: true) }.keyboardShortcut(.return, modifiers: [.command, .shift]).disabled(model.isBusy)
-                Button(model.isRecording ? "Finish Recording" : "Start Manual Recording") { model.toggleRecording() }
-                    .keyboardShortcut("r", modifiers: [.command, .shift]).disabled(model.isPlaying || model.isFinishing)
+                Button("Rehearse Storyboard") { model.playStoryboard(record: false) }
+                    .keyboardShortcut(.return, modifiers: .command).disabled(model.isBusy || model.currentScript == nil)
+                Button(model.isRecording ? "Finish Recording" : "Record Current Webpage") { model.toggleRecording() }
+                    .keyboardShortcut(.return, modifiers: [.command, .shift]).disabled(model.isPlaying || model.isFinishing || model.isPreparing)
+                Button("Record Storyboard") { model.playStoryboard(record: true) }
+                    .keyboardShortcut("r", modifiers: [.command, .shift]).disabled(model.isBusy || model.currentScript == nil)
                 Button("Stop Take") { model.director.cancel() }.keyboardShortcut(".", modifiers: .command).disabled(!model.isPlaying)
                 Divider()
                 Button("Show Exports", action: model.revealExport)
-                Button("Agent Connection") { model.showConnection = true }
+                Button("AI Director") { model.mode = .director }.disabled(model.isBusy)
+                Button("Switch to \(model.appearance == .light ? "Dark" : "Light") Theme") {
+                    model.appearance = model.appearance == .light ? .dark : .light
+                }
             }
         }
     }

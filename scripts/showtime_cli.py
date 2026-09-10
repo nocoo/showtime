@@ -10,13 +10,34 @@ from pathlib import Path
 # Keep the signed app bundle read-only when this entry point runs directly.
 sys.dont_write_bytecode = True
 from showtime_client import Client, ShowtimeError, absolute_path, resolve_script_paths
+from showtime_version import APP_VERSION
+
+
+def dimensions(value):
+    try:
+        width, height = (int(part) for part in value.lower().replace("×", "x").split("x"))
+        return {"width": width, "height": height}
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Use WIDTHxHEIGHT, for example 1920x1080") from exc
 
 
 def parser():
     root = argparse.ArgumentParser(prog="showtime", description="Direct real webpages. Make little films.")
+    root.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("status", help="Get browser, camera, recording, and job status")
     commands.add_parser("inspect", help="Get visible elements with selectors and viewport coordinates")
+    studio = commands.add_parser("studio", help="Choose the workspace mode or light/dark theme")
+    studio.add_argument("--mode", choices=["studio", "theater", "director"])
+    studio.add_argument("--theme", choices=["light", "dark"])
+    studio.add_argument("--inspector", choices=["Canvas", "Cursor", "Text", "Export"])
+    settings = commands.add_parser("settings", help="Read or adjust Canvas dimensions, video resolution, and frame rate")
+    settings.add_argument("--canvas", type=dimensions, metavar="WIDTHxHEIGHT")
+    settings.add_argument("--video", type=dimensions, metavar="WIDTHxHEIGHT")
+    settings.add_argument("--fps", type=int, choices=[24, 30, 60])
+    settings.add_argument("--inset", type=float)
+    settings.add_argument("--backdrop", choices=["mist", "pearl", "midnight"])
+    settings.add_argument("--browser-theme", dest="browserTheme", choices=["light", "dark"], help="Film browser title bar, independent of Studio appearance")
     open_parser = commands.add_parser("open", help="Navigate to a URL (showtime://demo opens Orbit)")
     open_parser.add_argument("url")
     open_parser.add_argument("--title")
@@ -44,9 +65,9 @@ def parser():
     rec = record.add_subparsers(dest="operation", required=True)
     start = rec.add_parser("start")
     start.add_argument("--output")
-    start.add_argument("--width", type=int, default=1920)
-    start.add_argument("--height", type=int, default=1080)
-    start.add_argument("--fps", type=int, choices=[24,30,60], default=30)
+    start.add_argument("--width", type=int, help="Defaults to the Studio video width")
+    start.add_argument("--height", type=int, help="Defaults to the Studio video height")
+    start.add_argument("--fps", type=int, choices=[24,30,60], help="Defaults to the Studio frame rate")
     rec.add_parser("stop")
     commands.add_parser("stop", help="Stop a job; an interrupted recording is finalized as a playable partial take")
     commands.add_parser("mcp-config", help="Print a ready-to-paste MCP configuration")
@@ -62,6 +83,18 @@ def main(argv=None):
             client = Client()
             if args.command == "status": value = client.status()
             elif args.command == "inspect": value = client.request("GET", "/v1/inspect")
+            elif args.command == "studio":
+                body = {key: getattr(args, key) for key in ("mode", "theme", "inspector") if getattr(args, key) is not None}
+                value = client.request("POST", "/v1/studio", body) if body else client.request("GET", "/v1/studio")
+            elif args.command == "settings":
+                canvas, video = dict(args.canvas or {}), dict(args.video or {})
+                for key in ("inset", "backdrop", "browserTheme"):
+                    if getattr(args, key) is not None: canvas[key] = getattr(args, key)
+                if args.fps is not None: video["fps"] = args.fps
+                body = {}
+                if canvas: body["canvas"] = canvas
+                if video: body["video"] = video
+                value = client.request("POST", "/v1/settings", body) if body else client.request("GET", "/v1/settings")
             elif args.command == "open":
                 step = {"action": "open", "url": args.url}
                 for key in ("title", "displayURL"):
@@ -88,7 +121,7 @@ def main(argv=None):
             elif args.command == "record":
                 if args.operation == "stop": value = client.request("POST", "/v1/recording/stop", {})
                 else:
-                    body = {"width": args.width, "height": args.height, "fps": args.fps}
+                    body = {key: getattr(args, key) for key in ("width", "height", "fps") if getattr(args, key) is not None}
                     if args.output: body["output"] = absolute_path(args.output)
                     value = client.request("POST", "/v1/recording/start", body)
             elif args.command == "stop": value = client.request("POST", "/v1/cancel", {})

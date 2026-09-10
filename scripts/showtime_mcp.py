@@ -35,14 +35,29 @@ STEP = {"type": "object", "description": "A Showtime action. Coordinates are CSS
     "steps": {"type":"array","items":{"type":"object"}},
 }, "required": ["action"], "additionalProperties": False}
 
+CANVAS_SETTINGS = schema({
+    "width": {"type": "integer", "minimum": 800, "maximum": 2560},
+    "height": {"type": "integer", "minimum": 500, "maximum": 1600},
+    "inset": NUMBER,
+    "backdrop": {"type": "string", "enum": ["mist", "pearl", "midnight"]},
+    "browserTheme": {"type": "string", "enum": ["light", "dark"], "description": "Film browser title bar theme, independent of Studio and webpage appearance."},
+})
+VIDEO_SETTINGS = schema({
+    "width": {"type": "integer", "minimum": 640, "maximum": 3840},
+    "height": {"type": "integer", "minimum": 360, "maximum": 2160},
+    "fps": {"type": "integer", "enum": [24, 30, 60]},
+})
+
 TOOLS = [
+    {"name":"showtime_settings","description":"Read or atomically update the same Canvas and video settings shown in Studio. Canvas uses CSS pixels; video uses even H.264 pixels. Changing canvas automatically fits the output to its aspect ratio unless video dimensions are supplied. Settings persist and apply to live recording. Available between takes.","inputSchema":schema({"canvas":CANVAS_SETTINGS,"video":VIDEO_SETTINGS})},
+    {"name":"showtime_studio","description":"Choose studio, theater, or director workspace and a light/dark Studio theme. Theater shows the real webpage with live director cue cards and progress. Director opens the agent setup guide and is available between takes. Studio appearance does not change the exported film.","inputSchema":schema({"mode":{"type":"string","enum":["studio","theater","director"]},"theme":{"type":"string","enum":["light","dark"]},"inspector":{"type":"string","enum":["Canvas","Cursor","Text","Export"]},"showInspector":BOOL})},
     {"name":"showtime_status","description":"Get the actual and displayed URL/title, viewport size, camera, cursor, and current recording/job state.","inputSchema":schema()},
     {"name":"showtime_inspect","description":"Inspect visible interactive webpage elements. Returns stable CSS selectors, labels, and bounding rectangles. Use before planning real clicks.","inputSchema":schema()},
     {"name":"showtime_open","description":"Navigate the native browser. Optional title/displayURL only change the film's browser chrome. Omit both to show real page details. Use showtime://demo for the bundled Orbit app.","inputSchema":schema({"url":STR,"title":STR,"displayURL":STR},["url"])},
     {"name":"showtime_act","description":"Perform a native mouse/keyboard action or change a cinematic effect. Click/type/scroll use native input. caption is non-blocking; wait adds a pause. zoom is a camera transform (1–4×). metadata replaces both overrides; omit a field to reset it. Cursor styles: arrow/hand use genuine macOS artwork; ring/dot/spotlight use color. custom needs image=absolute PNG path, optional hotspotX/hotspotY (0–1 fractions). clickEffect toggles ripples. parallel accepts one move, one zoom, one caption, and waits.","inputSchema":schema({"step":STEP,"wait":BOOL},["step"])},
-    {"name":"showtime_run","description":"Run a repeatable film script. Supply a script object or an absolute JSON path. Script shape: {version:1,name,canvas?:{width:1440,height:810,inset:32,backdrop:'mist'},recording?:{output,width:1920,height:1080,fps:30},steps:[...]}. Recording and canvas aspect ratios must match. Output paths must not exist. Returns a job immediately unless wait=true. Use showtime_job to follow progress. rehearse=true disables recording.","inputSchema":schema({"script":{"type":"object"},"path":STR,"output":STR,"rehearse":BOOL,"wait":BOOL})},
+    {"name":"showtime_run","description":"Run a repeatable film script. Supply a script object or an absolute JSON path. Script shape: {version:1,name,canvas?:{width:1920,height:1080,inset:32,backdrop:'mist'},recording?:{output,width:1920,height:1080,fps:30},steps:[...]}. Recording and canvas aspect ratios must match. Output paths must not exist. Returns a job immediately unless wait=true. Use showtime_job to follow progress. rehearse=true disables recording.","inputSchema":schema({"script":{"type":"object"},"path":STR,"output":STR,"rehearse":BOOL,"wait":BOOL})},
     {"name":"showtime_job","description":"Get a job's progress, cue results, errors, and MP4 output path. Set wait=true to wait for completion.","inputSchema":schema({"id":STR,"wait":BOOL},["id"])},
-    {"name":"showtime_record","description":"Start or stop a manual/API-driven recording, or cancel the active take. start allows subsequent showtime_act calls to direct a live recording. A cancelled script finalizes a playable partial MP4.","inputSchema":schema({"operation":{"type":"string","enum":["start","stop","cancel"]},"output":STR,"width":{"type":"integer"},"height":{"type":"integer"},"fps":{"type":"integer","enum":[24,30,60]}},["operation"])},
+    {"name":"showtime_record","description":"Record the current real webpage using Studio's video settings unless overridden. start allows subsequent showtime_act calls to direct a live recording. Stop saves an MP4; cancelling a script finalizes a playable partial take.","inputSchema":schema({"operation":{"type":"string","enum":["start","stop","cancel"]},"output":STR,"width":{"type":"integer"},"height":{"type":"integer"},"fps":{"type":"integer","enum":[24,30,60]}},["operation"])},
     {"name":"showtime_screenshot","description":"Capture the composed film canvas including browser chrome, camera, cursor, and captions. Saves a PNG and returns it for visual inspection. Output path must not exist.","inputSchema":schema({"output":STR,"includeImage":BOOL})},
 ]
 
@@ -51,6 +66,8 @@ def call_tool(name, args):
     client = Client()
     image_path = None
     if name == "showtime_status": value = client.status()
+    elif name == "showtime_settings": value = client.request("POST", "/v1/settings", args) if args else client.request("GET", "/v1/settings")
+    elif name == "showtime_studio": value = client.request("POST", "/v1/studio", args) if args else client.request("GET", "/v1/studio")
     elif name == "showtime_inspect": value = client.request("GET", "/v1/inspect")
     elif name == "showtime_open": value = client.act({"action":"open", **args})
     elif name == "showtime_act": value = client.act(args["step"], wait=args.get("wait",True))

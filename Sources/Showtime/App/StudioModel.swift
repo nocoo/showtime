@@ -6,7 +6,7 @@ import ShowtimeCore
 
 struct CameraState {
     var scale: Double = 1
-    var focus = CGPoint(x: 688, y: 335)
+    var focus = CGPoint(x: CanvasSpec().pageWidth / 2, y: CanvasSpec().pageHeight / 2)
 }
 
 struct PointerState {
@@ -47,9 +47,9 @@ final class EffectsState: ObservableObject {
     @Published var pulses: [ClickPulse] = []
     var captionTask: Task<Void, Never>?
 
-    func reset() {
+    func reset(pageSize: CGSize) {
         captionTask?.cancel()
-        camera = CameraState()
+        camera = CameraState(scale: 1, focus: CGPoint(x: pageSize.width / 2, y: pageSize.height / 2))
         caption = nil
         pulses = []
         pointer.visible = false
@@ -84,8 +84,13 @@ final class EffectsState: ObservableObject {
 @MainActor
 final class StudioModel: ObservableObject {
     @Published var canvas = CanvasSpec()
+    @Published var recordingSettings = RecordingSpec()
     @Published var actualTitle = "A new scene"
     @Published var actualURL = ""
+    @Published var favicon: NSImage? {
+        didSet { faviconRevision += 1 }
+    }
+    private(set) var faviconRevision = 0
     @Published var titleOverride = ""
     @Published var urlOverride = ""
     @Published var isLoading = false
@@ -94,10 +99,12 @@ final class StudioModel: ObservableObject {
     @Published var canGoForward = false
     @Published var addressEditing = false
     @Published var showInspector = true
-    @Published var theaterMode = false
-    @Published var showConnection = false
+    @Published var mode: StudioMode = .studio
+    @Published var appearance = StudioAppearance(rawValue: UserDefaults.standard.string(forKey: "studioAppearance") ?? "light") ?? .light {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "studioAppearance") }
+    }
     @Published var currentScript: FilmScript?
-    @Published var scriptName = "Orbit · A little more momentum"
+    @Published var scriptName = "Current webpage"
     @Published var currentStep = -1
     @Published var isPlaying = false
     @Published var isRecording = false
@@ -113,6 +120,8 @@ final class StudioModel: ObservableObject {
     @Published var selectedInspector = "Canvas"
 
     let effects = EffectsState()
+    let toasts = ToastCenter()
+    let activity = DirectorActivity()
     let browser = BrowserEngine()
     lazy var recorder = MovieRecorder(model: self)
     lazy var director = Director(model: self)
@@ -128,6 +137,18 @@ final class StudioModel: ObservableObject {
     var displayTitle: String { titleOverride.isEmpty ? actualTitle : titleOverride }
     var displayURL: String { urlOverride.isEmpty ? actualURL : urlOverride }
     var isBusy: Bool { isPlaying || isRecording || isFinishing || isPreparing }
+    var theaterMode: Bool {
+        get { mode == .theater }
+        set { mode = newValue ? .theater : .studio }
+    }
+    var studioState: [String: Any] {
+        ["mode": mode.rawValue, "theme": appearance.rawValue, "inspector": selectedInspector,
+         "showInspector": showInspector, "theater": theaterMode]
+    }
+    var captureState: [String: Any] {
+        ["canvas": ["width": canvas.width, "height": canvas.height, "inset": canvas.inset, "backdrop": canvas.backdrop, "browserTheme": canvas.browserTheme],
+         "video": ["width": recordingSettings.width, "height": recordingSettings.height, "fps": recordingSettings.fps]]
+    }
     var pageSize: CGSize { CGSize(width: canvas.pageWidth, height: canvas.pageHeight) }
     var demoURL: URL { URL(string: "http://127.0.0.1:\(agentPort)/demo/")! }
     var exportFolder: URL {
@@ -139,7 +160,14 @@ final class StudioModel: ObservableObject {
 
     init() {
         browser.owner = self
-        loadBundledScript()
+        if let data = UserDefaults.standard.data(forKey: "captureSettings"),
+           let saved = try? JSONDecoder().decode(CaptureSettings.self, from: data),
+           (try? saved.canvas.validate()) != nil, (try? saved.video.validate(canvas: saved.canvas)) != nil {
+            canvas = saved.canvas
+            recordingSettings = saved.video
+            recordingSettings.output = nil
+        }
+        effects.camera = CameraState(scale: 1, focus: CGPoint(x: canvas.pageWidth / 2, y: canvas.pageHeight / 2))
     }
 
     func start() {
@@ -187,16 +215,17 @@ final class StudioModel: ObservableObject {
         agentReady = true
         statusText = "Your next great demo starts here"
         Task { @MainActor in
-            do { try await browser.open(demoURL.absoluteString) }
+            do { try await browser.open(UserDefaults.standard.string(forKey: "lastWebsite") ?? demoURL.absoluteString) }
             catch { report(error) }
         }
     }
 
     func loadBundledScript() {
+        guard !isBusy else { return }
         guard let url = AppResources.bundle.url(forResource: "orbit-launch", withExtension: "json", subdirectory: "Scripts"),
               let data = try? Data(contentsOf: url), let script = try? JSONDecoder().decode(FilmScript.self, from: data) else { return }
-        currentScript = script
-        scriptName = script.name
+        do { try stageScript(script) }
+        catch { report(error) }
     }
 
     func importScript() {
@@ -208,22 +237,74 @@ final class StudioModel: ObservableObject {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let script = try JSONDecoder().decode(FilmScript.self, from: Data(contentsOf: url))
-            try script.validate(defaultCanvas: canvas)
-            currentScript = script
-            scriptName = script.name
-            currentStep = -1
+            try stageScript(script)
             statusText = "Script loaded · \(script.steps.count) cues"
             errorMessage = nil
         } catch { report(error) }
     }
 
-    func playDemo(record: Bool) {
+    func playStoryboard(record: Bool) {
         guard !isBusy, var script = currentScript else { return }
-        if record {
-            if script.recording == nil { script.recording = RecordingSpec() }
-        } else { script.recording = nil }
+        script.canvas = canvas
+        script.recording = record ? recordingSettings : nil
         do { _ = try director.run(script) }
         catch { report(error) }
+    }
+
+    func clearStoryboard() {
+        guard !isBusy else { return }
+        currentScript = nil
+        currentStep = -1
+        scriptName = "Current webpage"
+    }
+
+    func stageScript(_ script: FilmScript) throws {
+        try script.validate(defaultCanvas: canvas)
+        let nextCanvas = script.canvas ?? canvas
+        var nextVideo = try script.recording ?? recordingSettings.fitted(to: nextCanvas)
+        try nextVideo.validate(canvas: nextCanvas)
+        nextVideo.output = nil
+        canvas = nextCanvas
+        recordingSettings = nextVideo
+        currentScript = script
+        scriptName = script.name
+        currentStep = -1
+        persistCaptureSettings()
+    }
+
+    func applyCapture(canvas nextCanvas: CanvasSpec? = nil, video nextVideo: RecordingSpec? = nil) throws {
+        guard !isBusy else { throw ShowtimeError("The director is busy. Finish the take before changing capture settings.") }
+        let nextCanvas = nextCanvas ?? canvas
+        try nextCanvas.validate()
+        var nextVideo = try nextVideo ?? recordingSettings.fitted(to: nextCanvas)
+        try nextVideo.validate(canvas: nextCanvas)
+        nextVideo.output = nil
+        let resized = nextCanvas.width != canvas.width || nextCanvas.height != canvas.height || nextCanvas.inset != canvas.inset
+        canvas = nextCanvas
+        recordingSettings = nextVideo
+        currentScript?.canvas = nextCanvas
+        if var recording = currentScript?.recording {
+            recording.width = nextVideo.width; recording.height = nextVideo.height; recording.fps = nextVideo.fps
+            currentScript?.recording = recording
+        }
+        if resized {
+            effects.camera = CameraState(scale: 1, focus: CGPoint(x: nextCanvas.pageWidth / 2, y: nextCanvas.pageHeight / 2))
+            effects.pointer.visible = false
+            browser.surface?.updateCamera()
+        }
+        persistCaptureSettings()
+    }
+
+    func rememberRecordingSettings(_ spec: RecordingSpec) {
+        recordingSettings = spec
+        recordingSettings.output = nil
+        persistCaptureSettings()
+    }
+
+    private func persistCaptureSettings() {
+        if let data = try? JSONEncoder().encode(CaptureSettings(canvas: canvas, video: recordingSettings)) {
+            UserDefaults.standard.set(data, forKey: "captureSettings")
+        }
     }
 
     func saveCursorPreset() {
@@ -240,16 +321,18 @@ final class StudioModel: ObservableObject {
 
     func toggleRecording() {
         if isPlaying { director.cancel(); return }
+        guard !isPreparing, !isFinishing else { return }
         Task { @MainActor in
             do {
                 if isRecording { _ = try await recorder.stop() }
-                else { try await recorder.start(RecordingSpec()) }
+                else { try await recorder.start(recordingSettings) }
             } catch { report(error) }
         }
     }
 
     func navigate(_ url: String) {
-        guard !isPlaying, !isFinishing else { return }
+        guard !isPlaying, !isFinishing, !isPreparing else { return }
+        clearStoryboard()
         Task { @MainActor in
             do { try await browser.open(url) }
             catch { report(error) }
@@ -259,7 +342,15 @@ final class StudioModel: ObservableObject {
     func report(_ error: Error) {
         errorMessage = error.localizedDescription
         statusText = "Needs attention"
+        toasts.show("Something needs attention", message: error.localizedDescription, kind: .error)
         FileHandle.standardError.write(Data("Showtime: \(error.localizedDescription)\n".utf8))
+    }
+
+    func copyForAgent(_ text: String, title: String) {
+        NSPasteboard.general.clearContents()
+        if NSPasteboard.general.setString(text, forType: .string) {
+            toasts.show(title, message: "Paste it into your agent to continue.")
+        }
     }
 
     func revealExport() {
@@ -271,7 +362,7 @@ final class StudioModel: ObservableObject {
     }
 
     func chromeImage() throws -> CGImage {
-        let key = "\(displayTitle)|\(displayURL)|\(canvas.pageWidth)|\(canGoBack)|\(canGoForward)"
+        let key = "\(displayTitle)|\(displayURL)|\(canvas.pageWidth)|\(canvas.browserTheme)|\(faviconRevision)"
         if key == chromeCacheKey, let chromeCache { return chromeCache }
         let renderer = ImageRenderer(content: BrowserChromeView(model: self, exporting: true)
             .frame(width: canvas.pageWidth, height: CanvasSpec.chromeHeight)
@@ -285,7 +376,7 @@ final class StudioModel: ObservableObject {
 
     func screenshot(to path: String) async throws -> URL {
         let image = try await browser.snapshot()
-        let frame = try SceneCompositor.render(model: self, webImage: image, width: 1920, height: Int(1920 * Double(canvas.height) / Double(canvas.width)))
+        let frame = try SceneCompositor.render(model: self, webImage: image, width: recordingSettings.width, height: recordingSettings.height)
         let url = try OutputFiles.newURL(path: path, defaultFolder: exportFolder, ext: "png")
         let data = NSBitmapImageRep(cgImage: frame).representation(using: .png, properties: [:])
         guard let data else { throw ShowtimeError("PNG encoding failed.") }
@@ -302,7 +393,7 @@ final class StudioModel: ObservableObject {
         content.layoutSubtreeIfNeeded()
         guard let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { throw ShowtimeError("Could not capture the native studio controls.") }
         content.cacheDisplay(in: content.bounds, to: bitmap)
-        if nativeOnly, let data = bitmap.representation(using: .png, properties: [:]) {
+        if nativeOnly || mode == .director, let data = bitmap.representation(using: .png, properties: [:]) {
             let url = try OutputFiles.newURL(path: path, defaultFolder: exportFolder, ext: "png")
             try OutputFiles.writeNew(data, to: url)
             return url
@@ -344,6 +435,11 @@ final class StudioModel: ObservableObject {
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor); self.eventMonitor = nil }
         server.stop()
     }
+}
+
+private struct CaptureSettings: Codable {
+    let canvas: CanvasSpec
+    let video: RecordingSpec
 }
 
 enum OutputFiles {

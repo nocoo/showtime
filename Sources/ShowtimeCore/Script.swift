@@ -44,20 +44,22 @@ public enum JSONValue: Codable, Equatable, Sendable {
 }
 
 public struct CanvasSpec: Codable, Equatable, Sendable {
-    public var width: Int = 1440
-    public var height: Int = 810
+    public var width: Int = 1920
+    public var height: Int = 1080
     public var inset: Double = 32
     public var backdrop: String = "mist"
-    public static let chromeHeight: Double = 76
+    public var browserTheme: String = "light"
+    public static let chromeHeight: Double = 56
 
     public init() {}
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        width = try c.decodeIfPresent(Int.self, forKey: .width) ?? 1440
-        height = try c.decodeIfPresent(Int.self, forKey: .height) ?? 810
+        width = try c.decodeIfPresent(Int.self, forKey: .width) ?? 1920
+        height = try c.decodeIfPresent(Int.self, forKey: .height) ?? 1080
         inset = try c.decodeIfPresent(Double.self, forKey: .inset) ?? 32
         backdrop = try c.decodeIfPresent(String.self, forKey: .backdrop) ?? "mist"
+        browserTheme = try c.decodeIfPresent(String.self, forKey: .browserTheme) ?? "light"
     }
 
     public var pageWidth: Double { Double(width) - inset * 2 }
@@ -73,10 +75,13 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
         guard ["mist", "pearl", "midnight"].contains(backdrop) else {
             throw ShowtimeError("Unknown backdrop. Use mist, pearl, or midnight.")
         }
+        guard ["light", "dark"].contains(browserTheme) else {
+            throw ShowtimeError("Browser frame theme must be light or dark.")
+        }
     }
 }
 
-public struct RecordingSpec: Codable, Sendable {
+public struct RecordingSpec: Codable, Equatable, Sendable {
     public var output: String?
     public var width: Int = 1920
     public var height: Int = 1080
@@ -104,6 +109,33 @@ public struct RecordingSpec: Codable, Sendable {
         if let output, URL(fileURLWithPath: output).pathExtension.lowercased() != "mp4" {
             throw ShowtimeError("Recording output must have an .mp4 extension.")
         }
+    }
+
+    /// Find an encodable size close to the requested long edge while preserving
+    /// the canvas ratio. Searching even rows also handles odd/custom canvases
+    /// and portrait output without rounding outside the encoder's limits.
+    public func fitted(to canvas: CanvasSpec, longEdge: Int? = nil) throws -> RecordingSpec {
+        try canvas.validate()
+        // A theme or frame-rate edit must preserve a valid custom resolution.
+        if longEdge == nil, (try? validate(canvas: canvas)) != nil { return self }
+        let preferred = min(3840, max(640, longEdge ?? max(width, height)))
+        let ratio = Double(canvas.width) / Double(canvas.height)
+        var best: (width: Int, height: Int, distance: Int, error: Double)?
+        for h in stride(from: 360, through: 2160, by: 2) {
+            let w = min(3840, max(640, Int((Double(h) * ratio / 2).rounded()) * 2))
+            let error = abs(Double(w) / Double(h) - ratio)
+            guard error < 0.005 else { continue }
+            let distance = abs(max(w, h) - preferred)
+            if best == nil || distance < best!.distance || (distance == best!.distance && error < best!.error) {
+                best = (w, h, distance, error)
+            }
+        }
+        guard let best else { throw ShowtimeError("This canvas has no compatible H.264 output size.") }
+        var result = self
+        result.width = best.width
+        result.height = best.height
+        try result.validate(canvas: canvas)
+        return result
     }
 }
 

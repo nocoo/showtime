@@ -24,7 +24,7 @@ final class BrowserSurface: NSView {
     init(engine: BrowserEngine, effects: EffectsState) {
         self.engine = engine
         self.camera = CameraSurface(engine: engine, effects: effects)
-        super.init(frame: CGRect(x: 0, y: 0, width: 1376, height: 670))
+        super.init(frame: engine.webView.bounds)
         wantsLayer = true
         layer?.backgroundColor = NSColor.white.cgColor
         addSubview(engine.webView)

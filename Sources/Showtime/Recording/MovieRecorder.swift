@@ -42,6 +42,7 @@ final class MovieRecorder {
         try spec.validate(canvas: model.canvas)
         guard model.browser.ready else { throw ShowtimeError("Load a webpage before recording.") }
         guard model.window?.isMiniaturized != true else { throw ShowtimeError("Restore the browser window before recording.") }
+        if model.mode == .director { model.mode = .theater }
         model.isPreparing = true
         model.statusText = "Preparing your take"
         defer { model.isPreparing = false }
@@ -85,11 +86,13 @@ final class MovieRecorder {
         writer.startSession(atSourceTime: .zero)
         self.writer = writer; self.input = input; self.adaptor = adaptor
         self.spec = spec; outputURL = destination; workingURL = staging
+        model.rememberRecordingSettings(spec)
         frameCount = 0; captureCount = 0; previousBuffer = nil; totalRenderTime = 0
         startTime = CACurrentMediaTime()
         model.isRecording = true
         model.elapsed = 0
         model.statusText = "Recording a new take"
+        if !model.isPlaying { model.activity.recordingStarted() }
         do { try await consume(webImage: image, at: startTime) }
         catch { await fail(error); throw error }
     }
@@ -166,6 +169,8 @@ final class MovieRecorder {
             model.completedTakes += 1
             model.elapsed = Double(frameCount) / Double(spec.fps)
             model.statusText = "Saved · \(outputURL.lastPathComponent)"
+            model.toasts.show("Film saved", message: outputURL.lastPathComponent, exportURL: outputURL)
+            if !model.isPlaying { model.activity.finish(.completed, output: outputURL.path) }
             return result
         } catch {
             writer.cancelWriting()
@@ -180,6 +185,7 @@ final class MovieRecorder {
         if let workingURL { try? FileManager.default.removeItem(at: workingURL) }
         cleanup()
         model.report(error)
+        if !model.isPlaying { model.activity.finish(.failed, output: nil) }
         if model.isPlaying { model.director.abort(error) }
     }
 

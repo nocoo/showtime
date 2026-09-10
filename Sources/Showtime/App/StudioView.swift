@@ -6,29 +6,23 @@ struct StudioView: View {
     @ObservedObject var model: StudioModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var sidebarVisible: Bool { model.showInspector && !model.theaterMode }
+    private var sidebarVisible: Bool { model.showInspector && model.mode == .studio }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 16) {
-                if sidebarVisible {
-                    InspectorView(model: model, effects: model.effects)
-                        .frame(width: 280)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                }
-                VStack(spacing: 0) {
-                    canvasArea.frame(maxHeight: .infinity)
-                    if !model.theaterMode {
-                        Rectangle().fill(Theme.line).frame(height: 1).padding(.horizontal, 24)
-                        StoryboardView(model: model)
-                    }
-                }
-                .background(.white, in: RoundedRectangle(cornerRadius: 24))
-                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Theme.line, lineWidth: 0.75))
+            ZStack {
+                workspace
+                    .opacity(model.mode == .director ? 0 : 1)
+                    .allowsHitTesting(model.mode != .director)
+                    .accessibilityHidden(model.mode == .director)
+                DirectorGuideView(model: model)
+                    .opacity(model.mode == .director ? 1 : 0)
+                    .allowsHitTesting(model.mode == .director)
+                    .accessibilityHidden(model.mode != .director)
             }
             .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 8)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: sidebarVisible)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: model.theaterMode)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: model.mode)
             statusBar
         }
         .background(Theme.surface)
@@ -41,34 +35,44 @@ struct StudioView: View {
             ToolbarItem(placement: .principal) { modePicker }.hideSharedBackground()
             ToolbarItem(placement: .primaryAction) { transport }.hideSharedBackground()
         }
-        .sheet(isPresented: $model.showConnection) { ConnectionView(model: model) }
-        .overlay(alignment: .top) {
-            if let error = model.errorMessage {
-                HStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
-                    Text(error).font(.system(size: 14)).lineLimit(3)
-                    Spacer()
-                    Button { model.errorMessage = nil } label: { Image(systemName: "xmark") }
-                        .buttonStyle(StudioButtonStyle(treatment: .plain)).accessibilityLabel("Dismiss error")
+        .overlay(alignment: .topTrailing) {
+            StudioToastOverlay(center: model.toasts).padding(.trailing, 16).padding(.top, 12)
+        }
+    }
+
+    private var workspace: some View {
+        HStack(alignment: .top, spacing: 16) {
+                if sidebarVisible {
+                    InspectorView(model: model, effects: model.effects)
+                        .frame(width: 280)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                 }
-                .padding(14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.orange.opacity(0.25)))
-                .shadow(color: .black.opacity(0.08), radius: 14, y: 5)
-                .padding(.horizontal, 100).padding(.top, 12)
-            }
+                VStack(spacing: 0) {
+                    canvasArea.frame(maxHeight: .infinity)
+                    Rectangle().fill(Theme.line).frame(height: 1).padding(.horizontal, 24)
+                    if model.theaterMode {
+                        DirectorActivityView(model: model, activity: model.activity)
+                    } else {
+                        StoryboardView(model: model)
+                    }
+                }
+                .background(Theme.panel, in: RoundedRectangle(cornerRadius: 24))
+                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Theme.line, lineWidth: 0.75))
         }
     }
 
     private var brand: some View {
         HStack(spacing: 12) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Image(nsImage: AppResources.brandMark)
                     .resizable().renderingMode(.original).interpolation(.high).scaledToFit()
-                    .frame(width: 34, height: 34).accessibilityHidden(true)
-                Text("showtime").font(.system(size: 20, weight: .semibold, design: .rounded)).tracking(-0.6)
-            }.allowsHitTesting(false)
+                    .frame(width: 30, height: 30).accessibilityHidden(true)
+                Text("showtime").font(.system(size: 18, weight: .semibold, design: .rounded)).tracking(-0.4)
+            }
+            .shadow(color: .black.opacity(model.appearance == .dark ? 0.24 : 0.10), radius: 1.2, x: 0, y: 1)
+            .allowsHitTesting(false)
             Button {
-                if model.theaterMode { model.theaterMode = false; model.showInspector = true }
+                if model.mode != .studio { model.mode = .studio; model.showInspector = true }
                 else { model.showInspector.toggle() }
             } label: {
                 Image(systemName: "sidebar.left").font(.system(size: 16))
@@ -83,12 +87,15 @@ struct StudioView: View {
 
     private var modePicker: some View {
         HStack(spacing: 8) {
-            modeButton("Studio", symbol: "rectangle.leftthird.inset.filled", selected: !model.theaterMode) {
-                model.theaterMode = false
+            modeButton("Studio", symbol: "rectangle.leftthird.inset.filled", selected: model.mode == .studio) {
+                model.mode = .studio
             }
             modeButton("Theater", symbol: "rectangle.inset.filled", selected: model.theaterMode) {
                 model.theaterMode = true
             }
+            modeButton("AI Director", symbol: "sparkles", selected: model.mode == .director) {
+                model.mode = .director
+            }.disabled(model.isBusy)
         }
         .labelStyle(.titleAndIcon)
         .fixedSize(horizontal: true, vertical: false)
@@ -109,16 +116,23 @@ struct StudioView: View {
 
     private var transport: some View {
         HStack(spacing: 8) {
+            Button {
+                model.appearance = model.appearance == .light ? .dark : .light
+            } label: {
+                Image(systemName: model.appearance == .light ? "moon" : "sun.max")
+                    .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+            }.buttonStyle(StudioButtonStyle(treatment: .plain))
+                .help("Switch to \(model.appearance == .light ? "dark" : "light") theme")
+                .accessibilityLabel("Switch to \(model.appearance == .light ? "dark" : "light") theme")
             Button(action: model.revealExport) { Image(systemName: "folder") }
                 .buttonStyle(StudioButtonStyle(treatment: .plain))
                 .help("Show exports").accessibilityLabel("Show exports")
-            Button { model.playDemo(record: false) } label: { Label("Rehearse", systemImage: "play") }
-                .buttonStyle(StudioButtonStyle()).disabled(model.isBusy)
+            Button { model.playStoryboard(record: false) } label: { Label("Rehearse", systemImage: "play") }
+                .buttonStyle(StudioButtonStyle()).disabled(model.isBusy || model.currentScript == nil)
                 .help("Rehearse the storyboard · ⌘Return")
             Button {
                 if model.isPlaying { model.director.cancel() }
-                else if model.isRecording { model.toggleRecording() }
-                else { model.playDemo(record: true) }
+                else { model.toggleRecording() }
             } label: {
                 Label(recordingTitle, systemImage: model.isPlaying || model.isRecording ? "stop.fill" : "record.circle")
                     .fontWeight(.semibold).lineLimit(1).fixedSize(horizontal: true, vertical: false)
@@ -126,7 +140,7 @@ struct StudioView: View {
             }
             .buttonStyle(StudioButtonStyle(treatment: model.isPlaying || model.isRecording ? .recording : .accent))
             .disabled(model.isFinishing || model.isPreparing)
-            .help("Run the storyboard and export an MP4 · ⇧⌘Return")
+            .help("Record the current webpage · ⇧⌘Return")
         }.labelStyle(.titleAndIcon).fixedSize(horizontal: true, vertical: false)
             .padding(.trailing, 8).frame(height: 38)
     }
@@ -141,8 +155,8 @@ struct StudioView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Live preview").font(.system(size: 23, weight: .semibold)).tracking(-0.6)
-                    Text("A real browser. Ready for its close-up.")
+                    Text(model.theaterMode ? "Theater" : "Live preview").font(.system(size: 23, weight: .semibold)).tracking(-0.6)
+                    Text(model.theaterMode ? "Your product, in the spotlight." : "Open your website, set the scene, then press Record.")
                         .font(.system(size: 13)).foregroundStyle(Theme.muted)
                 }
                 Spacer(minLength: 8)
@@ -152,16 +166,31 @@ struct StudioView: View {
                 }.foregroundStyle(model.isRecording ? .red : Theme.accent)
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background((model.isRecording ? Color.red : Theme.accent).opacity(0.07), in: Capsule())
-                Label("\(model.canvas.width) × \(model.canvas.height)", systemImage: "aspectratio")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
-                    .padding(.leading, 3)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Button {
+                        model.mode = .studio; model.showInspector = true; model.selectedInspector = "Canvas"
+                    } label: {
+                        Label("\(model.canvas.width) × \(model.canvas.height)", systemImage: "aspectratio")
+                    }.buttonStyle(.plain).help("Canvas settings").accessibilityLabel("Canvas settings")
+                    Button {
+                        model.mode = .studio; model.showInspector = true; model.selectedInspector = "Export"
+                    } label: {
+                        Text("\(model.recordingSettings.width) × \(model.recordingSettings.height) · \(model.recordingSettings.fps) fps")
+                            .font(.system(size: 11))
+                    }.buttonStyle(.plain).help("Video export settings").accessibilityLabel("Video export settings")
+                }.font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted).padding(.leading, 3)
             }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 18)
+
+            if !model.theaterMode {
+                WebsiteLocationBar(model: model).padding(.horizontal, 24).padding(.bottom, 14)
+            }
 
             GeometryReader { geometry in
                 let scale = max(0.1, min((geometry.size.width - 48) / Double(model.canvas.width),
                                          (geometry.size.height - 42) / Double(model.canvas.height)))
                 VStack(spacing: 13) {
                     FilmStageView(model: model, effects: model.effects)
+                        .environment(\.colorScheme, .light)
                         .frame(width: Double(model.canvas.width), height: Double(model.canvas.height))
                         .scaleEffect(scale, anchor: .topLeading)
                         .frame(width: Double(model.canvas.width) * scale, height: Double(model.canvas.height) * scale, alignment: .topLeading)
@@ -171,7 +200,7 @@ struct StudioView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "cursorarrow.motionlines").font(.system(size: 12))
                         Text(model.isPlaying ? "Directing cue \(model.currentStep + 1)" : "Interact with the page to set the scene")
-                            .font(.system(size: 12))
+                            .font(.system(size: 12)).lineLimit(1)
                         Spacer()
                         Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11))
                         Text("Fit · \(Int(scale * 100))%").font(.system(size: 12, design: .monospaced))
@@ -188,7 +217,7 @@ struct StudioView: View {
                 .help("Showtime \(AppVersion.display)")
                 .accessibilityLabel("Showtime version \(AppVersion.number)")
             Rectangle().fill(Theme.line).frame(width: 1, height: 12).padding(.horizontal, 7)
-            Button { model.showConnection = true } label: {
+            Button { model.mode = model.isBusy ? .theater : .director } label: {
                 HStack(spacing: 6) {
                     Circle().fill(model.agentReady ? Theme.accent : .orange).frame(width: 5, height: 5)
                     Text(model.agentReady ? "Agent ready" : "Agent offline").font(.system(size: 12, weight: .medium))
@@ -207,6 +236,39 @@ struct StudioView: View {
                 .font(.system(size: 12)).foregroundStyle(Theme.muted)
         }.padding(.horizontal, 24).frame(height: 34)
     }
+}
+
+private struct WebsiteLocationBar: View {
+    @ObservedObject var model: StudioModel
+    @State private var address = ""
+    @State private var edited = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "globe").foregroundStyle(Theme.accent)
+                TextField("Open a website · localhost:3000 or https://your-product.com", text: Binding(get: { address }, set: { value in
+                    // AppKit can echo the current field value during focus setup.
+                    // Only a real edit should prevent navigation from updating it.
+                    guard value != address else { return }
+                    address = value; edited = true
+                }))
+                    .textFieldStyle(.plain).font(.system(size: 13)).focused($focused)
+                    .onSubmit(open).accessibilityLabel("Website to record")
+                if model.isLoading { ProgressView().controlSize(.small).scaleEffect(0.8) }
+            }
+            .padding(.horizontal, 12).frame(height: 40)
+            .background(Theme.field, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(focused ? Theme.accent.opacity(0.5) : Theme.line))
+            Button(action: open) { Label("Open", systemImage: "arrow.up.right") }
+                .buttonStyle(StudioButtonStyle()).disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .disabled(model.isPlaying || model.isFinishing || model.isPreparing)
+        .onAppear { address = model.actualURL }
+        .onChange(of: model.actualURL) { _, url in if !focused || !edited { address = url } }
+    }
+    private func open() { focused = false; edited = false; model.navigate(address) }
 }
 
 private struct StageCaptureAnchor: NSViewRepresentable {
@@ -268,21 +330,27 @@ struct StoryboardView: View {
             HStack(spacing: 9) {
                 Image(systemName: "film.stack").font(.system(size: 17)).foregroundStyle(Theme.accent)
                 Text("Storyboard").font(.system(size: 15, weight: .semibold))
-                Text("\(model.currentScript?.steps.count ?? 0) cues")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
-                    .padding(.horizontal, 7).padding(.vertical, 4).background(Theme.surface, in: Capsule())
+                if let script = model.currentScript {
+                    Text("\(script.steps.count) cues")
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                        .padding(.horizontal, 7).padding(.vertical, 4).background(Theme.surface, in: Capsule())
+                }
                 Spacer()
                 Button(action: model.importScript) { Label("Import script", systemImage: "square.and.arrow.down") }
                     .buttonStyle(StudioButtonStyle(treatment: .plain)).disabled(model.isBusy)
                 Menu {
                     Button("Load Orbit example", systemImage: "sparkles", action: model.loadBundledScript)
-                    Button("Start manual recording", systemImage: "record.circle", action: model.toggleRecording)
                     Button("Open demo website", systemImage: "globe") { model.navigate("showtime://demo") }
+                    if model.currentScript != nil {
+                        Divider()
+                        Button("Clear storyboard", systemImage: "xmark", action: model.clearStoryboard)
+                    }
                 } label: { Image(systemName: "ellipsis").font(.system(size: 16)).frame(width: 22, height: 28) }
                 .menuStyle(.borderlessButton).fixedSize().disabled(model.isBusy)
                 .help("Storyboard actions").accessibilityLabel("Storyboard actions")
             }
-            GeometryReader { geometry in
+            if model.currentScript != nil {
+                GeometryReader { geometry in
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal) {
                         HStack(spacing: 10) {
@@ -299,19 +367,31 @@ struct StoryboardView: View {
                             }
                         }
                 }
-            }.frame(height: 70)
-            HStack(spacing: 7) {
+                }.frame(height: 70)
+                HStack(spacing: 7) {
                 Text(model.scriptName).font(.system(size: 12)).lineLimit(1)
                 Spacer()
                 if model.isPlaying {
                     Text("Cue \(model.currentStep + 1) of \(model.currentScript?.steps.count ?? 0)")
                         .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.accent)
                 } else {
-                    Text("⌘ ↵").font(.system(size: 12, design: .monospaced))
-                        .padding(.horizontal, 5).padding(.vertical, 2).background(Theme.surface, in: RoundedRectangle(cornerRadius: 4))
-                    Text("to rehearse").font(.system(size: 12))
+                    Button { model.playStoryboard(record: true) } label: {
+                        Label("Record storyboard", systemImage: "record.circle")
+                    }.buttonStyle(StudioButtonStyle()).disabled(model.isBusy)
+                        .help("Run this storyboard and export a new MP4 using the current video settings")
                 }
-            }.foregroundStyle(Theme.muted)
+                }.foregroundStyle(Theme.muted)
+            } else {
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Let your agent direct the next take.").font(.system(size: 14, weight: .medium))
+                        Text("Create a storyboard with AI Director, or use Record to capture the current webpage.")
+                            .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    Button { model.mode = .director } label: { Label("AI Director", systemImage: "sparkles") }
+                        .buttonStyle(StudioButtonStyle()).disabled(model.isBusy)
+                }.padding(.bottom, 2)
+            }
         }.padding(.horizontal, 24).padding(.top, 14).padding(.bottom, 20)
     }
 

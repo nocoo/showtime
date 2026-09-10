@@ -21,6 +21,10 @@ python3 scripts/version.py bump minor       # 也支持 patch / major / 2.0.0
 
 脚本会同步生成 `AppVersion.swift` 和 `Info.plist`。直接编辑 package.json 后运行 `python3 scripts/version.py sync`。构建时自动同步，测试和 CI 检查一致性。打包时，MCP 工具随 App 携带 manifest 副本。
 
-发布时，维护根目录 CHANGELOG.md，运行 `scripts/test.sh` 和 `scripts/build.sh release`，提交并推送代码，然后创建相同版本的 Git tag 和 GitHub Release。Release 的 What's New 使用本版本 changelog，使用 `gh release create vX.Y.Z --verify-tag --title vX.Y.Z --notes-file <notes-file>` 发布。版本脚本本身不提交或推送代码。
+发布时，维护根目录 CHANGELOG.md，运行 `scripts/test.sh` 及相关原生集成检查，按 [macOS 签名](signing.md) 构建 Developer ID 通用 App，并通过 `scripts/package_release.py --notary-profile <profile>` 完成公证、stapling、ZIP 往返验证及 SHA-256。提交并推送代码后，创建相同版本的 Git tag 和 GitHub Release。Release 的 What's New 使用本版本 changelog；`gh release create vX.Y.Z --verify-tag --title vX.Y.Z --notes-file <notes-file> <app.zip> <app.sha256>` 必须附上经过验证的 App，GitHub 自动生成的源码附件不算安装包。完整操作顺序与下载后验收见根 [CLAUDE.md](../CLAUDE.md)。
+
+版本和打包脚本本身不提交、推送或发布。发布以用户当次授权为准；若已明确授权该版本，不重复请求确认；若要求先验收，本地构建不触发发布。未公开的中间版本归入最终版本的 changelog，不补造发布历史。
+
+证书未就绪时，经用户知情授权可以通过 `scripts/package_release.py --unnotarized` 发行，并在 Release 中明确未公证状态、实际签名方式和首次打开步骤。公证失败不得静默降级；详细条件见签名文档。
 
 发布后约 5 分钟检查 `gh run list --limit 5` 和对应 CI 日志；失败应修复并重新验证。README 保持简短。

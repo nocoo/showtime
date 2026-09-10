@@ -40,6 +40,50 @@ final class ScriptTests {
         XCTAssertThrowsError(try film.validate())
     }
 
+    func testVideoFollowsLandscapeAndPortraitCanvas() throws {
+        var canvas = CanvasSpec(), video = RecordingSpec()
+        video.fps = 60; video.output = "/tmp/product-film.mp4"
+        let wide = try video.fitted(to: canvas, longEdge: 3840)
+        XCTAssertEqual(wide.width, 3840); XCTAssertEqual(wide.height, 2160)
+        canvas.width = 900; canvas.height = 1600
+        let portrait = try video.fitted(to: canvas)
+        XCTAssertEqual(portrait.width, 1080); XCTAssertEqual(portrait.height, 1920)
+        XCTAssertEqual(portrait.fps, 60); XCTAssertEqual(portrait.output, video.output)
+        let bounded = try video.fitted(to: canvas, longEdge: 3840)
+        try bounded.validate(canvas: canvas)
+        XCTAssertLessThanOrEqual(bounded.height, 2160)
+        canvas.width = 1440; canvas.height = 900
+        let desktop = try video.fitted(to: canvas)
+        XCTAssertEqual(desktop.width, 1920); XCTAssertEqual(desktop.height, 1200)
+    }
+
+    func testCustomCanvasAlwaysProducesCompatibleVideo() throws {
+        for width in [800, 801, 1333, 2560] {
+            for height in [500, 501, 811, 1600] {
+                var canvas = CanvasSpec(); canvas.width = width; canvas.height = height
+                for edge in [1280, 1920, 3840] {
+                    let video = try RecordingSpec().fitted(to: canvas, longEdge: edge)
+                    try video.validate(canvas: canvas)
+                }
+            }
+        }
+    }
+
+    func testVideoFittingDoesNotHideInvalidSettings() throws {
+        var canvas = CanvasSpec(), video = RecordingSpec()
+        video.fps = 25
+        XCTAssertThrowsError(try video.fitted(to: canvas))
+        video.fps = 24; canvas.width = 400
+        XCTAssertThrowsError(try video.fitted(to: canvas))
+    }
+
+    func testCustomVideoSurvivesAppearanceAndFrameRateEdits() throws {
+        var canvas = CanvasSpec(), video = RecordingSpec()
+        video.width = 1920; video.height = 1082; video.fps = 60
+        canvas.browserTheme = "dark"
+        XCTAssertEqual(try video.fitted(to: canvas), video)
+    }
+
     func testParallelTracksCannotRaceForTheSameProperty() throws {
         let film = try script(#"{"steps":[{"action":"parallel","steps":[{"action":"zoom","scale":2},{"action":"zoom","scale":3}]}]}"#)
         XCTAssertThrowsError(try film.validate())

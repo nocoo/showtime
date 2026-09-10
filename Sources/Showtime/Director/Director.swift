@@ -35,12 +35,18 @@ final class Director {
     init(model: StudioModel) { self.model = model }
 
     @discardableResult
-    func run(_ script: FilmScript, singleAction: Bool = false) throws -> String {
+    func run(_ script: FilmScript, singleAction: Bool = false, source: DirectorActivitySource = .local) throws -> String {
         try script.validate(defaultCanvas: model.canvas)
         guard !model.isPlaying, !model.isFinishing, !model.isPreparing else { throw ShowtimeError("The director is busy. Wait for the current job or stop it first.") }
         guard !(model.isRecording && script.recording != nil) else { throw ShowtimeError("A recording is already in progress.") }
         guard !(model.isRecording && script.canvas != nil && script.canvas != model.canvas) else {
             throw ShowtimeError("Canvas dimensions cannot change during a recording.")
+        }
+        if !singleAction {
+            try model.stageScript(script)
+            model.effects.reset(pageSize: model.pageSize)
+        } else if script.steps.first?.action == .open {
+            model.clearStoryboard()
         }
         let job = JobRecord(name: script.name, total: script.steps.count)
         if jobs.count >= 40, let oldest = jobs.values.filter({ $0.status != "running" }).min(by: { $0.started < $1.started }) { jobs.removeValue(forKey: oldest.id) }
@@ -48,13 +54,11 @@ final class Director {
         currentJobID = job.id
         abortError = nil
         model.errorMessage = nil
+        model.toasts.dismiss()
+        if model.mode == .director { model.mode = .theater }
+        model.activity.begin(script, id: job.id, source: source, singleAction: singleAction)
         model.isPlaying = true
-        if !singleAction {
-            model.currentScript = script
-            model.scriptName = script.name
-            model.effects.reset()
-        }
-        task = Task { @MainActor in await self.execute(script, jobID: job.id) }
+        task = Task { @MainActor in await self.execute(script, jobID: job.id, singleAction: singleAction) }
         return job.id
     }
 
@@ -62,7 +66,7 @@ final class Director {
     func abort(_ error: Error) { abortError = error; cancel() }
     func waitUntilStopped() async { await task?.value }
 
-    private func execute(_ script: FilmScript, jobID: String) async {
+    private func execute(_ script: FilmScript, jobID: String, singleAction: Bool) async {
         var ownsRecording = false
         do {
             if let canvas = script.canvas {
@@ -73,7 +77,7 @@ final class Director {
             var startIndex = 0
             // Navigation is preparation, so a recorded film opens on a fully rendered first frame.
             if script.recording != nil, script.steps.first?.action == .open {
-                try await runStep(script.steps[0], index: 0, jobID: jobID)
+                try await runStep(script.steps[0], index: 0, script: script, jobID: jobID)
                 startIndex = 1
             }
             if let recording = script.recording {
@@ -82,7 +86,7 @@ final class Director {
             }
             for index in startIndex..<script.steps.count {
                 try Task.checkCancellation()
-                try await runStep(script.steps[index], index: index, jobID: jobID)
+                try await runStep(script.steps[index], index: index, script: script, jobID: jobID)
             }
             if ownsRecording {
                 let result = try await model.recorder.stop()
@@ -90,7 +94,8 @@ final class Director {
                 jobs[jobID]?.results.append(["recording": result.json])
             }
             jobs[jobID]?.status = "completed"
-            model.statusText = ownsRecording ? "A good take. Ready to share." : "Rehearsal complete"
+            model.statusText = ownsRecording ? "A good take. Ready to share." : singleAction
+                ? (script.steps.first?.action == .open ? "Website ready" : "Action complete") : "Rehearsal complete"
         } catch {
             let cancelled = error is CancellationError && abortError == nil
             if ownsRecording && model.isRecording {
@@ -107,6 +112,8 @@ final class Director {
             } else { model.statusText = "Take stopped" }
         }
         jobs[jobID]?.finished = Date()
+        let finalPhase: DirectorActivityPhase = jobs[jobID]?.status == "completed" ? .completed : jobs[jobID]?.status == "cancelled" ? .stopped : .failed
+        model.activity.finish(finalPhase, output: jobs[jobID]?.output)
         if let output = jobs[jobID]?.output, let job = jobs[jobID] {
             let sidecar = URL(fileURLWithPath: output).deletingPathExtension().appendingPathExtension("json")
             if let data = try? JSONSerialization.data(withJSONObject: job.json, options: [.prettyPrinted, .sortedKeys]) {
@@ -118,7 +125,8 @@ final class Director {
         task = nil
     }
 
-    private func runStep(_ step: Action, index: Int, jobID: String) async throws {
+    private func runStep(_ step: Action, index: Int, script: FilmScript, jobID: String) async throws {
+        model.activity.beginCue(step, index: index, script: script, jobID: jobID)
         model.currentStep = index
         model.statusText = step.displayLabel
         jobs[jobID]?.step = index + 1
@@ -128,6 +136,7 @@ final class Director {
                                      "duration": CACurrentMediaTime() - started]
         if let value { result["value"] = value }
         jobs[jobID]?.results.append(result)
+        model.activity.completeCue(index: index)
     }
 
     func perform(_ step: Action) async throws -> Any? {

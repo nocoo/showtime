@@ -175,13 +175,15 @@ final class AutomationServer {
             case ("GET", "/v1/status"):
                 return .json(status())
             case ("GET", "/v1/inspect"):
-                return .json(try await model.browser.inspect())
+                let inspection = try await model.browser.inspect()
+                model.activity.inspected()
+                return .json(inspection)
             case ("GET", "/v1/scripts/demo"):
                 guard let url = AppResources.bundle.url(forResource: "orbit-launch", withExtension: "json", subdirectory: "Scripts") else { throw ShowtimeError("Bundled script is missing.") }
                 return HTTPResponse(body: try Data(contentsOf: url))
             case ("POST", "/v1/run"):
                 let script = try JSONDecoder().decode(FilmScript.self, from: request.body)
-                let id = try model.director.run(script)
+                let id = try model.director.run(script, source: .agent)
                 return .json(["job": id, "status": "running", "poll": "/v1/jobs/\(id)"], status: 202)
             case ("POST", "/v1/actions"), ("POST", "/v1/open"):
                 var data = request.body
@@ -192,7 +194,7 @@ final class AutomationServer {
                 }
                 let action = try JSONDecoder().decode(Action.self, from: data)
                 let script = FilmScript(name: action.displayLabel, steps: [action])
-                let id = try model.director.run(script, singleAction: true)
+                let id = try model.director.run(script, singleAction: true, source: .agent)
                 return .json(["job": id, "status": "running", "poll": "/v1/jobs/\(id)"], status: 202)
             case ("POST", "/v1/cancel"):
                 if model.isPlaying { model.director.cancel(); return .json(["status": "stopping", "job": model.director.currentJobID ?? ""]) }
@@ -200,7 +202,7 @@ final class AutomationServer {
                 return .json(["status": "idle"])
             case ("POST", "/v1/recording/start"):
                 guard !model.isPlaying else { throw ShowtimeError("Wait for the current job before starting a manual recording.") }
-                let spec = request.body.isEmpty ? RecordingSpec() : try JSONDecoder().decode(RecordingSpec.self, from: request.body)
+                let spec = try merged(model.recordingSettings, patch: dictionary(request.body), allowed: ["width", "height", "fps", "output"])
                 try await model.recorder.start(spec)
                 return .json(["status": "recording"])
             case ("POST", "/v1/recording/stop"):
@@ -218,16 +220,40 @@ final class AutomationServer {
                 let object = try dictionary(request.body)
                 let path = object["output"] as? String ?? model.exportFolder.appendingPathComponent("Studio-\(UUID().uuidString.prefix(8)).png").path
                 return .json(["path": try await model.studioScreenshot(to: path, nativeOnly: object["nativeOnly"] as? Bool ?? false).path])
+            case ("GET", "/v1/studio"):
+                return .json(model.studioState)
+            case ("GET", "/v1/settings"):
+                return .json(model.captureState)
+            case ("POST", "/v1/settings"):
+                let object = try dictionary(request.body)
+                guard Set(object.keys).isSubset(of: ["canvas", "video"]) else { throw ShowtimeError("Capture settings accept canvas and video objects.") }
+                let canvas = try merged(model.canvas, patch: object["canvas"] ?? [:], allowed: ["width", "height", "inset", "backdrop", "browserTheme"])
+                let fitted = try model.recordingSettings.fitted(to: canvas)
+                let video = try merged(fitted, patch: object["video"] ?? [:], allowed: ["width", "height", "fps"])
+                try model.applyCapture(canvas: canvas, video: video)
+                return .json(model.captureState)
             case ("POST", "/v1/studio"):
                 let object = try dictionary(request.body)
+                var mode: StudioMode?
+                if let raw = object["mode"] as? String {
+                    guard let parsed = StudioMode(rawValue: raw) else { throw ShowtimeError("Studio mode must be studio, theater, or director.") }
+                    mode = parsed
+                } else if let theater = object["theater"] as? Bool { mode = theater ? .theater : .studio }
+                if mode == .director, model.isBusy { throw ShowtimeError("The director is busy. Finish the take before opening the setup page.") }
+                var appearance: StudioAppearance?
+                if let raw = object["theme"] as? String {
+                    guard let parsed = StudioAppearance(rawValue: raw) else { throw ShowtimeError("Studio theme must be light or dark.") }
+                    appearance = parsed
+                }
                 if let tab = object["inspector"] as? String {
-                    guard ["Canvas", "Cursor", "Text"].contains(tab) else { throw ShowtimeError("Inspector tab must be Canvas, Cursor, or Text.") }
+                    guard ["Canvas", "Cursor", "Text", "Export"].contains(tab) else { throw ShowtimeError("Inspector tab must be Canvas, Cursor, Text, or Export.") }
                     model.selectedInspector = tab
                     model.showInspector = true
                 }
                 if let visible = object["showInspector"] as? Bool { model.showInspector = visible }
-                if let theater = object["theater"] as? Bool { model.theaterMode = theater }
-                return .json(["inspector": model.selectedInspector, "showInspector": model.showInspector, "theater": model.theaterMode])
+                if let mode { model.mode = mode }
+                if let appearance { model.appearance = appearance }
+                return .json(model.studioState)
             case ("GET", "/v1/studio/window"):
                 guard let window = model.window else { throw ShowtimeError("The studio window is not ready.") }
                 return .json(StudioWindow.state(window))
@@ -245,6 +271,7 @@ final class AutomationServer {
                 return .json(["error": "Endpoint not found."], status: 404)
             }
         } catch {
+            model.report(error)
             let busy = error.localizedDescription.contains("busy") || error.localizedDescription.contains("already") || error.localizedDescription.contains("Wait for")
             return .json(["error": error.localizedDescription], status: busy ? 409 : 400)
         }
@@ -256,20 +283,36 @@ final class AutomationServer {
         return object
     }
 
+    private func merged<T: Codable>(_ current: T, patch: Any, allowed: Set<String>) throws -> T {
+        guard let patch = patch as? [String: Any], Set(patch.keys).isSubset(of: allowed) else {
+            throw ShowtimeError("Expected settings with these fields: \(allowed.sorted().joined(separator: ", ")).")
+        }
+        var object = try dictionary(JSONEncoder().encode(current))
+        for (key, value) in patch {
+            guard !(value is NSNull) else { throw ShowtimeError("Setting \(key) cannot be null.") }
+            object[key] = value
+        }
+        return try JSONDecoder().decode(T.self, from: JSONSerialization.data(withJSONObject: object))
+    }
+
     private func status() -> [String: Any] {
         var object: [String: Any] = [
             "app": "Showtime", "version": 1, "appVersion": AppVersion.number, "ready": model.browser.ready,
             "playing": model.isPlaying, "recording": model.isRecording, "preparing": model.isPreparing, "finishing": model.isFinishing,
             "title": model.actualTitle, "url": model.actualURL,
             "displayTitle": model.displayTitle, "displayURL": model.displayURL,
+            "favicon": ["loaded": model.favicon != nil],
             "viewport": ["width": model.browser.webView.bounds.width, "height": model.browser.webView.bounds.height],
-            "canvas": ["width": model.canvas.width, "height": model.canvas.height, "inset": model.canvas.inset, "backdrop": model.canvas.backdrop],
+            "canvas": ["width": model.canvas.width, "height": model.canvas.height, "inset": model.canvas.inset, "backdrop": model.canvas.backdrop, "browserTheme": model.canvas.browserTheme],
+            "video": ["width": model.recordingSettings.width, "height": model.recordingSettings.height, "fps": model.recordingSettings.fps],
+            "storyboard": ["name": model.scriptName, "cues": model.currentScript?.steps.count ?? 0],
             "camera": ["scale": model.effects.camera.scale, "x": model.effects.camera.focus.x, "y": model.effects.camera.focus.y],
             "cursor": ["style": model.effects.pointer.style, "visible": model.effects.pointer.visible, "size": model.effects.pointer.size,
                        "x": model.effects.pointer.point.x, "y": model.effects.pointer.point.y, "color": model.effects.pointer.color,
                        "hotspotX": model.effects.pointer.hotspot.x, "hotspotY": model.effects.pointer.hotspot.y,
                        "clickEffect": model.effects.pointer.clickEffect],
-            "studio": ["inspector": model.selectedInspector, "showInspector": model.showInspector, "theater": model.theaterMode],
+            "studio": model.studioState,
+            "director": model.activity.state.json,
             "elapsed": model.elapsed, "status": model.statusText,
         ]
         if let job = model.director.currentJobID { object["job"] = job }

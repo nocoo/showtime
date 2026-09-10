@@ -28,6 +28,28 @@ def main():
         raise ShowtimeError("Finish the current take before running integration checks.")
     assert status["appVersion"] == APP_VERSION, "Rebuild and reopen the app first."
 
+    original_settings = client.request("GET", "/v1/settings")
+    try:
+        # Orbit intentionally overflows at this authored viewport. At the new
+        # 1920 × 1080 default it fits vertically, so a scroll cannot change scrollTop.
+        client.request("POST", "/v1/settings", {
+            "canvas": {"width": 1440, "height": 810, "inset": 32},
+            "video": {"width": 1920, "height": 1080, "fps": 30},
+        })
+        check_input(client, output)
+    finally:
+        if any(client.status()[key] for key in ("playing", "recording", "preparing", "finishing")):
+            client.request("POST", "/v1/cancel", {})
+            deadline = time.monotonic() + 20
+            while any(client.status()[key] for key in ("playing", "recording", "preparing", "finishing")):
+                if time.monotonic() >= deadline:
+                    raise ShowtimeError("The check did not stop; restore capture settings after it finishes.")
+                time.sleep(0.1)
+        client.request("POST", "/v1/settings", original_settings)
+
+
+def check_input(client: Client, output: Path):
+
     def act(action, **values):
         return client.act({"action": action, **values})
 

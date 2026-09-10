@@ -16,6 +16,7 @@ struct InspectorView: View {
                 navigationItem("Canvas", symbol: "rectangle.inset.filled")
                 navigationItem("Cursor", symbol: "cursorarrow.rays")
                 navigationItem("Text", symbol: "textformat")
+                navigationItem("Export", symbol: "square.and.arrow.up")
             }
 
             ScrollView {
@@ -23,12 +24,12 @@ struct InspectorView: View {
                     switch model.selectedInspector {
                     case "Cursor": cursorControls
                     case "Text": textControls
+                    case "Export": CaptureControls(model: model, section: .video)
                     default: canvasControls
                     }
                 }.padding(.bottom, 2)
             }.scrollIndicators(.automatic)
 
-            connectionCard
         }
         .frame(maxHeight: .infinity).tint(Theme.accent)
         .onChange(of: effects.pointer.style) { model.saveCursorPreset() }
@@ -50,7 +51,7 @@ struct InspectorView: View {
             }
             .foregroundStyle(selected ? Theme.accent : Theme.muted)
             .padding(.horizontal, 14).frame(height: 42)
-            .background(selected ? .white : .clear, in: RoundedRectangle(cornerRadius: 12))
+            .background(selected ? Theme.panel : .clear, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(selected ? Theme.line : .clear, lineWidth: 0.75))
             .contentShape(RoundedRectangle(cornerRadius: 12))
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? [.isSelected] : [])
@@ -58,24 +59,22 @@ struct InspectorView: View {
 
     private var canvasControls: some View {
         Group {
-            InspectorSection(title: "Browser identity", symbol: "globe") {
-                labeledField("Display title", placeholder: "Use page title", text: $model.titleOverride)
-                labeledField("Display address", placeholder: "Use real URL", text: $model.urlOverride)
-                Text("Leave blank to show the real page details.")
-                    .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
-                if !model.titleOverride.isEmpty || !model.urlOverride.isEmpty {
-                    Button { model.titleOverride = ""; model.urlOverride = "" } label: {
-                        Label("Reset to page details", systemImage: "arrow.uturn.backward")
-                            .font(.system(size: 12, weight: .medium))
-                    }.foregroundStyle(Theme.accent).buttonStyle(.plain).disabled(model.isBusy)
-                }
-            }
+            CaptureControls(model: model, section: .canvas)
             InspectorSection(title: "Frame & backdrop", symbol: "photo.on.rectangle.angled") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Browser title bar").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                    StudioSegmentedPicker(title: "Browser title bar", choices: [("light", "Light"), ("dark", "Dark")], selection: Binding(get: { model.canvas.browserTheme }, set: { theme in
+                        var canvas = model.canvas; canvas.browserTheme = theme
+                        do { try model.applyCapture(canvas: canvas) }
+                        catch { model.report(error) }
+                    })).disabled(model.isBusy)
+                }
                 HStack(spacing: 9) {
                     ForEach(["mist", "pearl", "midnight"], id: \.self) { style in
                         Button {
-                            model.canvas.backdrop = style
-                            model.currentScript?.canvas = model.canvas
+                            var canvas = model.canvas; canvas.backdrop = style
+                            do { try model.applyCapture(canvas: canvas) }
+                            catch { model.report(error) }
                         } label: {
                             VStack(spacing: 8) {
                                 ZStack {
@@ -93,27 +92,29 @@ struct InspectorView: View {
                             .accessibilityAddTraits(model.canvas.backdrop == style ? [.isSelected] : [])
                     }
                 }
-                infoRow("Canvas", value: "\(model.canvas.width) × \(model.canvas.height)")
                 VStack(spacing: 9) {
                     infoRow("Inset", value: "\(Int(model.canvas.inset)) px")
                     Slider(value: Binding(get: { model.canvas.inset }, set: {
-                        model.canvas.inset = $0.rounded(); model.currentScript?.canvas = model.canvas
-                    }), in: 0...100).controlSize(.small).disabled(model.isBusy).accessibilityLabel("Browser inset")
+                        var canvas = model.canvas; canvas.inset = $0.rounded()
+                        do { try model.applyCapture(canvas: canvas) }
+                        catch { model.report(error) }
+                    }), in: 0...min(160, Double(model.canvas.width - 600) / 2, (Double(model.canvas.height) - 300 - CanvasSpec.chromeHeight) / 2))
+                        .controlSize(.small).disabled(model.isBusy).accessibilityLabel("Browser inset")
+                }
+            }
+            InspectorSection(title: "Browser identity", symbol: "globe") {
+                labeledField("Display title", placeholder: "Use page title", text: $model.titleOverride)
+                labeledField("Display address", placeholder: "Use real URL", text: $model.urlOverride)
+                Text("Leave blank to show the real page details.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
+                if !model.titleOverride.isEmpty || !model.urlOverride.isEmpty {
+                    Button { model.titleOverride = ""; model.urlOverride = "" } label: {
+                        Label("Reset to page details", systemImage: "arrow.uturn.backward")
+                            .font(.system(size: 12, weight: .medium))
+                    }.foregroundStyle(Theme.accent).buttonStyle(.plain).disabled(model.isBusy)
                 }
             }
             cameraControls
-            InspectorSection(title: "Export", symbol: "square.and.arrow.up") {
-                infoRow("Format", value: "MP4 · H.264")
-                infoRow("Resolution", value: "\(model.currentScript?.recording?.width ?? 1920) × \(model.currentScript?.recording?.height ?? 1080)")
-                infoRow("Frame rate", value: "\(model.currentScript?.recording?.fps ?? 30) fps")
-                Button { model.toggleRecording() } label: {
-                    Label(model.isRecording && !model.isPlaying ? "Finish recording" : "Record manually", systemImage: "record.circle")
-                        .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent)
-                }.buttonStyle(.plain).disabled(model.isPlaying || model.isFinishing || model.isPreparing)
-                Button(action: model.revealExport) {
-                    Label("Open exports", systemImage: "folder").font(.system(size: 13)).foregroundStyle(Theme.muted)
-                }.buttonStyle(.plain)
-            }
         }
     }
 
@@ -182,10 +183,10 @@ struct InspectorView: View {
                     Button(action: chooseCustomCursor) {
                         Label("Choose another image…", systemImage: "arrow.triangle.2.circlepath").font(.system(size: 12))
                     }.buttonStyle(.plain).foregroundStyle(Theme.accent)
-                    Picker("Click point", selection: Binding(get: { effects.pointer.hotspot.x == 0.5 ? "center" : "tip" }, set: {
+                    Text("Click point").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                    StudioSegmentedPicker(title: "Click point", choices: [("tip", "Top left"), ("center", "Center")], selection: Binding(get: { effects.pointer.hotspot.x == 0.5 ? "center" : "tip" }, set: {
                         effects.pointer.hotspot = $0 == "center" ? CGPoint(x: 0.5, y: 0.5) : .zero
-                    })) { Text("Top left").tag("tip"); Text("Center").tag("center") }
-                        .font(.system(size: 13)).controlSize(.small)
+                    }))
                     Text("Transparent PNG works best.").font(.system(size: 12)).foregroundStyle(Theme.muted)
                 }
             }
@@ -243,12 +244,10 @@ struct InspectorView: View {
                 labeledField("Supporting line", placeholder: "Optional", text: $captionSubtitle)
             }
             InspectorSection(title: "Presentation", symbol: "rectangle.3.group.bubble") {
-                Picker("Style", selection: $captionStyle) {
-                    Text("Glass").tag("glass"); Text("Minimal").tag("minimal"); Text("Title").tag("title")
-                }.font(.system(size: 13)).controlSize(.small)
-                Picker("Position", selection: $captionPosition) {
-                    Text("Bottom").tag("bottom"); Text("Center").tag("center"); Text("Top").tag("top")
-                }.font(.system(size: 13)).controlSize(.small)
+                Text("Style").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                StudioSegmentedPicker(title: "Caption style", choices: [("glass", "Glass"), ("minimal", "Minimal"), ("title", "Title")], selection: $captionStyle)
+                Text("Position").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.muted)
+                StudioSegmentedPicker(title: "Caption position", choices: [("bottom", "Bottom"), ("center", "Center"), ("top", "Top")], selection: $captionPosition)
                 Button {
                     var action = Action(.caption); action.text = captionText; action.subtitle = captionSubtitle
                     action.style = captionStyle; action.position = captionPosition; action.duration = 4
@@ -267,22 +266,6 @@ struct InspectorView: View {
         }.disabled(model.isPlaying)
     }
 
-    private var connectionCard: some View {
-        Button { model.showConnection = true } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "terminal").font(.system(size: 18)).foregroundStyle(Theme.accent)
-                    .frame(width: 36, height: 36).background(Theme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Connect your agent").font(.system(size: 13, weight: .semibold))
-                    Text("Your next take starts here.").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right").font(.system(size: 11)).foregroundStyle(Theme.muted)
-            }
-            .padding(13).background(.white, in: RoundedRectangle(cornerRadius: 15))
-            .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(Theme.line, lineWidth: 0.75))
-        }.buttonStyle(.plain)
-    }
 
     private func labeledField(_ label: String, placeholder: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -307,44 +290,5 @@ struct InspectorView: View {
             Text(title).font(.system(size: 13)); Spacer()
             Toggle(title, isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
-    }
-}
-
-struct ConnectionView: View {
-    @ObservedObject var model: StudioModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var copied = false
-    private var mcpConfig: String {
-        let bundled = Bundle.main.resourceURL?.appendingPathComponent("Tools/showtime_mcp.py").path ?? ""
-        let fallback = FileManager.default.currentDirectoryPath + "/scripts/showtime_mcp.py"
-        let path = FileManager.default.fileExists(atPath: bundled) ? bundled : fallback
-        let object: [String: Any] = ["mcpServers": ["showtime": ["command": "python3", "args": [path]]]]
-        return String(decoding: try! JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]), as: UTF8.self)
-    }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Image(systemName: "terminal.fill").font(.system(size: 25)).foregroundStyle(Theme.accent)
-                Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
-            }
-            VStack(alignment: .leading, spacing: 7) {
-                Text("Give your agent the director’s chair.").font(.system(size: 23, weight: .semibold)).tracking(-0.5)
-                Text("Use the MCP bridge, the CLI, or the local HTTP API.").font(.system(size: 14)).foregroundStyle(Theme.muted)
-            }
-            HStack {
-                Circle().fill(model.agentReady ? Color.green : Color.orange).frame(width: 7, height: 7)
-                Text("http://127.0.0.1:\(model.agentPort)").font(.system(size: 14, design: .monospaced))
-                Spacer()
-                Text("LOCAL ONLY").font(.system(size: 10, weight: .bold)).tracking(1).foregroundStyle(Theme.muted)
-            }.padding(13).background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
-            Text(mcpConfig).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
-                .padding(15).frame(maxWidth: .infinity, alignment: .leading).background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
-            Button(copied ? "Copied" : "Copy MCP configuration") {
-                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(mcpConfig, forType: .string); copied = true
-            }.buttonStyle(.borderedProminent).tint(Theme.accent)
-            Text("The bridge reads the session token from ~/Library/Application Support/Showtime/connection.json. No credentials need to be pasted into your agent configuration.")
-                .font(.system(size: 13)).foregroundStyle(Theme.muted).lineSpacing(3)
-        }.padding(30).frame(width: 590).foregroundStyle(Theme.ink).background(.white)
     }
 }
