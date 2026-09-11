@@ -1,6 +1,6 @@
 ---
 name: showtime-project-demo
-description: Create or finish narrated project demos with real Showtime webpage recordings, Remotion intro/outro bookends, subtitles, and optional background music. Use for project introduction videos, bilingual demos, 项目演示视频、贴片、配音、配乐, or adding sound to an existing MP4.
+description: Create or finish project demos with real Showtime webpage recordings, Remotion intro/outro bookends, narration, subtitles, and optional background music. Use for project introduction videos, bilingual demos, 项目演示视频及其贴片、配音、配乐, or adding sound to an existing demo MP4.
 ---
 
 # Showtime project demo
@@ -8,13 +8,17 @@ description: Create or finish narrated project demos with real Showtime webpage 
 Tell a useful product story with real website interactions. Showtime captures the webpage;
 Remotion renders brand bookends; speech and music are mixed into the final MP4 with FFmpeg.
 Showtime itself currently exports silent video. Do not claim it records microphone or system audio.
-For an audio-only revision, reuse the approved picture and bookends instead of recording again.
+For an audio-only revision, probe the supplied MP4 with ffprobe and preserve its picture,
+bookends, video format, and timing. Collect only missing sound and delivery choices, then use
+[Narration and subtitles](#narration-and-subtitles) and/or [Background music and mastering](#background-music-and-mastering),
+followed by [Verify, archive, and deliver](#verify-archive-and-deliver). Skip visual design,
+capture, and bookend rendering; a running Showtime app and a source checkout are not required.
 
 ## Collect the missing brief first
 
-Read the conversation, repository README, supplied brand assets, and `showtime status` before
-asking. Retain every explicit preference, including later corrections. A pasted generic
-45-second Orbit example does not replace the user's actual project or requested duration.
+Read the conversation, available production files, repository README, and supplied brand
+assets before asking. Read `showtime status` when planning a new webpage capture. Retain every
+explicit preference, including later corrections; bundled examples do not set the project or duration.
 
 Ask the user about missing dimensions and visual style **before designing or recording**.
 Bundle the missing choices into one short brief or at most three focused questions. Offer
@@ -37,14 +41,13 @@ depend on a new visual approval.
 | Music | On/off, supplied or freely licensed track, mood, vocals/no vocals, intensity, attribution requirements |
 | Delivery | New output folder/filenames, reusable source, archive location, Git/media policy |
 
-Suggested intake wording: “I have the project and languages. Should I keep the current
-4K/30 fps Canvas and device frame? What intro/outro branding and background would you like?
-For sound, do you want narration, background music, or both?” Omit questions already answered.
-Do not use this example's dimensions as defaults without the user's brief.
+Suggested intake wording: “Should I keep the current Canvas, export settings, and device frame?
+What intro/outro branding and background would you like? For sound, do you want narration,
+background music, or both?” Include actual settings from status and omit questions already answered.
 
-If the user says “配音” for a film that already contains speech, inspect the audio stream and
-clarify whether they want replacement narration or background music. Preserve existing valid
-speech while preparing the optional music; never stack two narrators by accident.
+For an existing film, inspect its audio and distinguish adding music, adding narration, and
+replacing narration. Follow an explicit request such as “replace the voice”; clarify only when
+the intended treatment of existing speech is unclear. Do not infer a request for music from “配音”.
 
 ## Connect to the current Showtime tools
 
@@ -81,10 +84,12 @@ and an invitation. Group small secondary features into a short supporting scene.
 Show the result and the method behind it; avoid claims that the capture does not demonstrate.
 An upload button is not evidence that a large upload completed.
 
-Create a timestamped production inside the target project, separate from Showtime's application
-dependencies. Keep `brief.json`, `story.json`, `run.json`, `films/`, `bookends/`, `scripts/`,
-`public/audio/`, `process/`, and `verification/` together. Use a new run or checkpoint for a
-meaningful revision. Existing reviewed media must never be overwritten.
+Use the requested output/archive location, or create a timestamped production inside the target
+project, separate from Showtime's application dependencies. Without a repository, a new folder
+beside the supplied MP4 is sufficient. Keep relevant `brief.json`, `story.json`, `run.json`,
+scripts, media, and verification together; create `films/`, `bookends/`, `public/audio/`, and
+`process/` only as needed. Use a new run or checkpoint for a meaningful revision. Existing
+reviewed media must never be overwritten.
 
 Plan the full timeline before recording. For example, a **requested** one-minute film may
 allocate 2 seconds to the intro, 54 to the website, and 4 to the outro. Bookend lengths,
@@ -124,8 +129,9 @@ showtime record films/demo.json --output /ABSOLUTE/NEW/raw.mp4 --no-wait
 showtime job JOB_ID
 ```
 
-Wait for `completed` and retain the full job JSON. MCP record/rehearse returns a job by default;
-use `showtime_job`. Ranges include both endpoints and refer to steps/IDs, not timecodes.
+Wait for `status: "completed"` and retain the full job JSON; `completed` alone is a step count.
+MCP record/rehearse returns a job by default; use `showtime_job`. Ranges include both endpoints
+and refer to steps/IDs, not timecodes.
 During playback use status/job queries, composed screenshots, or stop. Do not send live design
 or settings edits. A stopped job may have a playable partial movie; it is not a completed take.
 
@@ -150,9 +156,10 @@ an incomplete or badly timed take. Exact-duration films need integer frame count
 
 ## Render the Remotion bookends
 
-Use a separate small Remotion project with a pinned lockfile; do not add Node dependencies to
-Showtime's root package. Keep every Remotion package on the same version. A verified baseline
-is Remotion / `@remotion/cli` 4.0.520, React 19.2.3, and TypeScript 5.9.3.
+Render bookends only when included in the brief. Use a separate small Remotion project with a
+pinned lockfile; do not add Node dependencies to Showtime's root package. Keep every Remotion
+package on the same version. A verified baseline is Remotion / `@remotion/cli` 4.0.520,
+React 19.2.3, and TypeScript 5.9.3.
 Use approved local SVG/raster logos and local fonts with recorded source URLs and hashes.
 Load assets with `staticFile`, images with `Img`, and await font readiness with
 `delayRender` / `continueRender`; failed font loads must fail the render.
@@ -230,8 +237,9 @@ Render subtitles with local fonts. If FFmpeg lacks libass/drawtext, render capti
 alpha MOV with Chrome/Remotion, then overlay it in a safe region outside the device frame.
 Verify glyphs, line wrapping, contrast, and the beginning/end of each sentence at full size.
 Offer a sidecar SRT and optionally an embedded `mov_text` track. Do not replace useful titles
-with a wall of spoken text. An audio-only revision can retain existing burned subtitles
-only when the narration words and timings are unchanged.
+with a wall of spoken text. Update subtitle text/timing when narration changes. Updating burned
+subtitles is a picture edit: use a clean source when available and re-encode the affected picture;
+`-c:v copy` can preserve burned subtitles only when their words and timings remain valid.
 
 ## Background music and mastering
 
@@ -259,16 +267,21 @@ or taste; never label them a human listening review.
 
 Use FFmpeg from a reproducible production script with argument arrays, `-n`, and fresh output
 paths. For picture edits, join the checked intro, website footage and outro, then overlay
-subtitles and add timed voice. For an audio-only revision, `-c:v copy` preserves the approved
-video without another encode; preserve optional subtitle streams too (`-map 0:s? -c:s copy`).
-Do not accidentally mix the source's existing speech twice.
+subtitles and add timed voice. For an audio-only revision, use the approved movie as input 0
+and label the final audio graph output `[master]`. Explicitly select all intended streams with
+`-map 0:v:0 -map '[master]' -map '0:s?' -c:v copy -c:s copy`; a subtitle-only `-map` disables
+automatic video/audio selection. Copy subtitle streams only while their text and timing remain
+valid. Include retained source speech once in the mix; exclude it when replacing narration.
 
 An audio graph typically resamples stems to 48 kHz stereo, aligns speech to scene starts,
-pads/trims to final duration, applies music gain/fades/ducking, then uses
-`amix=inputs=2:normalize=0`. Master the combined mix with **two-pass** `loudnorm`, using measured
-I/TP/LRA/threshold and offset in the second pass; a useful target is −16 LUFS with a −1.5 dBTP
-ceiling. Re-measure the encoded AAC, since encoding can alter the true peak. Export H.264
-`yuv420p`, AAC 48 kHz stereo and `+faststart`, with even dimensions matching Canvas aspect ratio.
+pads/trims to final duration, and applies music gain/fades/ducking. Combine two stems with
+`amix=inputs=2:normalize=0`; a single stem needs no `amix`. Master the mix with **two-pass**
+`loudnorm`, using measured I/TP/LRA/threshold and offset in the second pass; a useful target is
+−16 LUFS with a −1.5 dBTP ceiling. Re-measure the encoded AAC, since encoding can alter the true
+peak. Encode requested audio as AAC 48 kHz stereo and use `+faststart` for the MP4. Newly encoded
+picture uses H.264 `yuv420p`, with even dimensions matching the agreed aspect ratio. Audio-only
+revisions stream-copy video without filters or a forced frame rate; verify that the source
+codec, dimensions, frame rate, and presentation timing are retained after muxing.
 
 Do not hardcode 60 seconds, 4K, or eight scenes into a reusable helper. Read the accepted brief
 and actual media duration. Preserve voice speed. Keep the exact filter graph, FFmpeg commands,
@@ -276,10 +289,11 @@ normalization measurements, stream probes, input/output hashes and the selected 
 
 ## Verify, archive, and deliver
 
-Require a completed recording job before treating a new capture as final. Verify codec,
-dimensions, fps, frame count/duration, audible stream presence, subtitle tracks, and full
-audio/video decode. For audio-only changes, compare video packet hashes or decoded frame
-hashes with the input so unchanged picture is established, not assumed.
+Require recording job `status: "completed"` before treating a new capture as final. Verify codec,
+dimensions, fps, frame count/duration, requested audio/subtitle streams, and full audio/video
+decode. A silent brief does not require an audio stream. For audio-only changes, compare video
+packet hashes or decoded frame hashes, plus relative presentation timestamps and duration, with
+the input so unchanged picture and timing are established, not assumed.
 
 Inspect representative final frames, captions, every scene transition, and the closing color.
 Play the exported MP4 in a real browser/player, seek to chapters and verify sound/subtitles
@@ -298,6 +312,7 @@ ignore MP4/MOV, audio, screenshots, downloaded fonts and dependency caches. Pres
 ignored resources in the local archive. Inspect staged paths and sizes, run relevant checks,
 and use normal hooks. A video task alone does not authorize an app release or deployment.
 
-Return the verified new MP4(s), reusable Showtime JSON, the story/transcript, this skill or its
-source location, and a concise description of actual checks. Mention retained speech, chosen
-music and any material recording limitation. Complete the authorized export before handing back.
+Return the verified new MP4(s), production scripts, any supplied or newly created Showtime JSON
+and story/transcript, this skill or its source location, and a concise description of actual
+checks. Audio-only work does not require inventing a capture script. Mention retained speech,
+chosen music and any material recording limitation. Complete the authorized export before handing back.
