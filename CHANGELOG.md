@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-11
+
 - Add transparent HTML/React animation overlays driven by the CLI/MCP `overlay` action, with source loading, props, frame callbacks, timed hiding, setup preloading, and parallel tracks. Preserve native webpage clicks and keyboard focus; composite the same layer in previews, PNGs, and full-resolution MP4s. Include a bundled-React example, authoring guides, and native/video integration checks.
 - Add a project-demo skill for collecting missing creative settings, producing Remotion bookends, timing narration/subtitles, and mixing optional music while preserving approved footage. Expose it through `showtime guide project-demo` and the MCP help topic, and include it in explicit agent-tool installation and package validation.
 - Clarify audio-only demo edits: reuse existing media without capture prerequisites, explicitly map video/audio/subtitle streams, and preserve the source video format and timing.
