@@ -1,6 +1,7 @@
 import AppKit
 import QuartzCore
 import SwiftUI
+import ShowtimeCore
 
 struct WebSurfaceView: NSViewRepresentable {
     let model: StudioModel
@@ -59,6 +60,7 @@ final class CameraSurface: NSView {
         wantsLayer = true
         layer?.masksToBounds = true
         layer?.isGeometryFlipped = true
+        layer?.backgroundColor = NSColor.white.cgColor
         imageLayer.anchorPoint = .zero
         imageLayer.contentsGravity = .resize
         imageLayer.minificationFilter = .trilinear
@@ -76,15 +78,13 @@ final class CameraSurface: NSView {
         let c = effects.camera
         imageLayer.bounds = CGRect(origin: .zero, size: bounds.size)
         imageLayer.position = .zero
-        imageLayer.setAffineTransform(CGAffineTransform(a: c.scale, b: 0, c: 0, d: c.scale,
-                                                       tx: c.focus.x * (1 - c.scale), ty: c.focus.y * (1 - c.scale)))
-        isHidden = c.scale <= 1.001
+        imageLayer.setAffineTransform(c.transform)
+        isHidden = c.isIdentity
         CATransaction.commit()
     }
 
     private func pagePoint(_ event: NSEvent) -> CGPoint {
-        let p = convert(event.locationInWindow, from: nil), c = effects.camera
-        return CGPoint(x: (p.x - c.focus.x) / c.scale + c.focus.x, y: (p.y - c.focus.y) / c.scale + c.focus.y)
+        convert(event.locationInWindow, from: nil).applying(effects.camera.transform.inverted())
     }
     override func mouseDown(with event: NSEvent) { try? engine?.mouse(.leftMouseDown, at: pagePoint(event)) }
     override func mouseUp(with event: NSEvent) { try? engine?.mouse(.leftMouseUp, at: pagePoint(event)) }

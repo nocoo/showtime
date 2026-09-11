@@ -23,7 +23,7 @@ Pages run in WebKit. Recordings include the browser frame, backdrop, presentatio
 ## Features
 
 - **Real webpage interaction** — Open public sites or local development pages. Move, click, double-click, drag, scroll, and type using CSS selectors or coordinates; wait for elements and check page state.
-- **Camera and composition** — Choreograph zoom, movement, and animated titles, including parallel actions. Choose a backdrop, adjust canvas inset, and independently set the browser title and address shown in the recording. Canvas presets and custom sizes support up to 4K (3840 × 2160).
+- **Camera and composition** — Combine close-up and offsets with the Camera pad, then animate them together in scripts. Choreograph titles and parallel actions. Nine backdrops retain the original green and add presentation gray, pale candy colors, and an adjustable central glow. Canvas supports up to 4K (3840 × 2160); compact browser controls provide Back, Forward, and Stop loading.
 - **Device frames** — Choose iPhone 16 Pro / Pro Max, iPad Pro 11 / 13-inch, or MacBook Neo and MacBook Pro frames redrawn from the 2026 designs, with None as the default. Light uses silver; Dark uses indigo on Neo and space black on other devices. Set Content width to size the screen independently and center the device with more space around it, or keep Auto to fit the Canvas. Web content and hardware render at the Export resolution, including 4K.
 - **Presentation cursors** — Use macOS arrow and hand artwork, a ring, dot, spotlight, or a custom PNG. Adjust size, color, hotspot, and click effects.
 - **Repeatable scripts** — Save actions as JSON, rehearse, then record. Jobs report progress and individual cue results, support asynchronous execution, and can be stopped early.
@@ -66,55 +66,66 @@ scripts/run.sh
 The script builds and opens `dist/Showtime.app`. Keep the app running when using the CLI or MCP. Rehearse the bundled Orbit script, then export your first demo:
 
 ```sh
-scripts/showtime demo --rehearse
-scripts/showtime demo --output artifacts/orbit-launch.mp4
+showtime example > film.json
+showtime validate film.json
+showtime rehearse film.json
+showtime record film.json --output ~/Movies/Showtime/orbit-launch.mp4
 ```
 
 Use a new output path for each export; existing files are not overwritten. Recording dimensions must match the canvas aspect ratio.
 
 ## Commands
 
-Run these from the repository root. Use `scripts/showtime --help` for the full reference.
+After the PATH setup above, run these from any directory. Use `showtime --help` for command options and `showtime schema` for the action grammar.
 
 | Command | Purpose |
 | --- | --- |
-| `scripts/showtime status` | Inspect page, camera, cursor, recording, and job state |
-| `scripts/showtime open http://localhost:3000` | Open a page; public URLs and `showtime://demo` also work |
-| `scripts/showtime inspect` | Get selectors, labels, and coordinates for visible interactive elements |
-| `scripts/showtime act '{"action":"click","selector":"#new-project"}'` | Execute one action; this example targets the bundled Orbit page |
-| `scripts/showtime run examples/local-product.json --rehearse` | Rehearse a custom script after replacing the sample URL and selectors |
-| `scripts/showtime run film.json --output artifacts/film.mp4` | Run and record a script; add `--no-wait` to return a job ID immediately |
-| `scripts/showtime job JOB_ID` / `scripts/showtime wait JOB_ID` | Inspect progress or wait for completion |
-| `scripts/showtime record start --output artifacts/take.mp4` | Start a manual or API-directed recording; finish with `record stop` |
-| `scripts/showtime screenshot artifacts/frame.png` | Save the composed canvas, including camera, cursor, and text |
-| `scripts/showtime stop` | Stop the active job and finalize recorded footage |
-| `scripts/showtime mcp-config` | Print configuration for an MCP client |
+| `showtime guide` / `showtime schema camera` | Read the bundled skill, workflow, and exact JSON syntax |
+| `showtime example` | Print an editable Orbit script |
+| `showtime status` | Inspect page, camera, cursor, recording, and job state |
+| `showtime design '{"action":"open","url":"http://localhost:3000"}'` | Open a page during design; public URLs and `showtime://demo` also work |
+| `showtime inspect` | Get selectors, labels, and coordinates for visible interactive elements |
+| `showtime settings --frame iphone-16-pro --content-width 400` | Set the frame and its inner screen width; use `auto` to fit |
+| `showtime design '{"action":"caption","text":"Hello"}' --screenshot /tmp/preview-new.png` | Preview one action and capture the result |
+| `showtime validate film.json` | Preflight the whole script and selected range |
+| `showtime rehearse film.json --from feature --to closing` | Rehearse an inclusive range of step IDs or one-based numbers |
+| `showtime record film.json --output ~/Movies/Showtime/film.mp4` | Run and record a script; add `--no-wait` to return a job ID immediately |
+| `showtime job JOB_ID` / `showtime wait JOB_ID` | Inspect progress or wait for completion |
+| `showtime screenshot /tmp/frame-new.png` | Save the composed canvas, including camera, cursor, and text |
+| `showtime stop` | Cancel the active job and finalize recorded footage |
+| `showtime mcp-config` / `showtime mcp` | Print MCP configuration or start the stdio bridge |
+
+Design uses individual actions and screenshots. Rehearsal and recording execute prewritten JSON scripts locally, including all waits and transitions. Model thinking and network round trips do not interrupt playback. Design, script `setup`, and script `steps` share the same action objects. Design captions remain visible for inspection; playback captions expire after their duration. Camera actions support zooming in and out, translation, rotation, and horizontal/vertical mirroring.
 
 ### Connect an agent
 
-Run `scripts/showtime mcp-config` and merge the output into a client that supports MCP stdio. The configuration uses local Python and an absolute script path; session credentials are discovered automatically.
+Run `showtime mcp-config` and merge the output into a client that supports MCP stdio. The configuration invokes the stable `~/Library/Application Support/Showtime/bin/showtime` entry point through `/bin/sh`, which expands HOME. Session credentials are discovered automatically; source and App paths are unnecessary.
 
-Available tools are `showtime_status`, `showtime_inspect`, `showtime_open`, `showtime_act`, `showtime_run`, `showtime_job`, `showtime_record`, and `showtime_screenshot`. A typical workflow is to inspect elements, plan a script, rehearse, verify the result, and record.
+Available tools are `showtime_help`, `showtime_status`, `showtime_inspect`, `showtime_settings`, `showtime_studio`, `showtime_design`, `showtime_validate`, `showtime_rehearse`, `showtime_record`, `showtime_job`, `showtime_stop`, and `showtime_screenshot`. Start with `showtime_help`; `topic: "script"` or an action name returns its schema.
+
+AI Director's **Copy instructions for your agent** includes the creative brief, current settings, connection instructions, syntax discovery commands, and the complete [bundled skill](../skills/showtime/SKILL.md). The Agent can start without locating a source checkout.
 
 ### Write a script
 
-Save this as `film.json` and use the `run` command above:
+Save this as `film.json`, then use `showtime rehearse film.json` and `showtime record film.json --output /tmp/first-take-new.mp4`:
 
 ```json
 {
   "version": 1,
   "name": "First take",
-  "steps": [
+  "setup": [
     { "action": "open", "url": "showtime://demo" },
-    { "action": "waitFor", "selector": "#new-project" },
-    { "action": "move", "selector": "#new-project", "duration": 0.8 },
+    { "action": "waitFor", "selector": "#new-project" }
+  ],
+  "steps": [
+    { "id": "feature", "action": "move", "selector": "#new-project", "duration": 0.8 },
     { "action": "click", "selector": "#new-project" },
-    { "action": "wait", "duration": 1.5 }
+    { "id": "closing", "action": "wait", "duration": 1.5 }
   ]
 }
 ```
 
-`caption` does not pause subsequent actions; add `wait` when text needs time on screen. See the [local product script](../examples/local-product.json), [cursor examples](../examples/cursor-styles.json), and [Orbit film](../Sources/Showtime/Resources/Scripts/orbit-launch.json) for fuller examples.
+Playback resets visual effects and runs `setup` before every selected range, outside the MP4. Ranges select steps, not video timecodes; skipped steps are never implicitly replayed. Put required page state in setup. `caption` does not pause subsequent actions; add `wait` when text needs time on screen. See the [local product script](../examples/local-product.json), [cursor examples](../examples/cursor-styles.json), and [Orbit film](../Sources/Showtime/Resources/Scripts/orbit-launch.json) for fuller examples.
 
 ## Project structure
 
@@ -162,6 +173,7 @@ Native integration checks need Showtime open with no recording or rehearsal in p
 
 ```sh
 python3 scripts/test_integration.py
+python3 scripts/test_workflow.py
 ```
 
 ## Documentation
@@ -170,6 +182,7 @@ python3 scripts/test_integration.py
 | --- | --- |
 | [中文 README](../README.md) | Chinese usage guide |
 | [Example scripts](../examples/) | Local product demos and cursor configuration |
+| [Bundled skill](../skills/showtime/SKILL.md) | Design, script authoring, range playback, progress, and syntax discovery |
 | [Version management](versioning.md) | Version source, synchronization, and release commands; Chinese |
 | [Changelog](../CHANGELOG.md) | Changes by version |
 | [GitHub Releases](https://github.com/nocoo/showtime/releases) | Published versions |

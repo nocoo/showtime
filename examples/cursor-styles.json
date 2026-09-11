@@ -12,14 +12,17 @@
     "height": 1080,
     "fps": 30
   },
-  "steps": [
+  "setup": [
     {
       "action": "open",
       "url": "showtime://demo",
       "title": "Orbit — Work in your rhythm",
       "displayURL": "https://app.orbit.so"
-    },
+    }
+  ],
+  "steps": [
     {
+      "id": "arrow",
       "action": "marker",
       "text": "System arrow"
     },
@@ -52,6 +55,7 @@
       "duration": 1.8
     },
     {
+      "id": "hand",
       "action": "marker",
       "text": "System hand"
     },
@@ -84,6 +88,7 @@
       "duration": 1.8
     },
     {
+      "id": "ring",
       "action": "marker",
       "text": "Focus ring"
     },
@@ -116,6 +121,7 @@
       "duration": 1.8
     },
     {
+      "id": "dot",
       "action": "marker",
       "text": "Soft dot"
     },
@@ -148,6 +154,7 @@
       "duration": 1.8
     },
     {
+      "id": "spotlight",
       "action": "marker",
       "text": "Spotlight"
     },

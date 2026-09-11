@@ -7,6 +7,53 @@ final class ScriptTests {
         try JSONDecoder().decode(FilmScript.self, from: Data(json.utf8))
     }
 
+    func testPlaybackRangesKeepOriginalStepNumbers() throws {
+        let film = try script(#"{"setup":[{"id":"prepare","action":"wait"}],"steps":[{"id":"intro","action":"wait"},{"id":"feature","action":"wait"},{"id":"closing","action":"wait"}]}"#)
+        try film.validate()
+        var request = PlaybackRequest(script: film)
+        XCTAssertEqual(try request.selectedRange(), 0..<3)
+        request.from = .string("feature"); request.to = .number(3)
+        XCTAssertEqual(try request.selectedRange(), 1..<3)
+        request.to = .string("feature")
+        XCTAssertEqual(try request.selectedRange(), 1..<2)
+        for invalid in [JSONValue.bool(true), .number(0), .number(1.5), .number(4), .string("prepare"), .string("missing")] {
+            request.from = invalid
+            XCTAssertThrowsError(try request.selectedRange())
+        }
+        request.from = .number(3); request.to = .number(1)
+        XCTAssertThrowsError(try request.selectedRange())
+    }
+
+    func testSetupAndIDsArePreflighted() throws {
+        for json in [
+            #"{"setup":[{"action":"click"}],"steps":[{"action":"wait"}]}"#,
+            #"{"steps":[{"id":"same","action":"wait"},{"id":"same","action":"wait"}]}"#,
+            #"{"steps":[{"id":"2","action":"wait"}]}"#,
+            #"{"steps":[{"id":" 2 ","action":"wait"}]}"#,
+            #"{"steps":[{"id":"1.5","action":"wait"}]}"#,
+            #"{"steps":[{"id":" ","action":"wait"}]}"#,
+            #"{"steps":[{"action":"parallel","steps":[{"action":"zoom"},{"action":"camera","flipX":true}]}]}"#,
+            #"{"steps":[{"action":"camera","scale":0}]}"#,
+        ] { XCTAssertThrowsError(try script(json).validate()) }
+    }
+
+    func testCameraTransformsRoundTripInput() throws {
+        var camera = CameraState(scale: 0.5, focus: CGPoint(x: 300, y: 200))
+        camera.offset = CGPoint(x: 40, y: -25)
+        camera.rotation = 90; camera.flipX = true
+        let focus = camera.focus.applying(camera.transform)
+        XCTAssertEqual(focus, CGPoint(x: 340, y: 175))
+        let point = CGPoint(x: 120, y: 80)
+        let projected = point.applying(camera.transform)
+        let restored = projected.applying(camera.transform.inverted())
+        XCTAssertLessThanOrEqual(abs(restored.x - point.x), 0.0001)
+        XCTAssertLessThanOrEqual(abs(restored.y - point.y), 0.0001)
+        XCTAssertTrue(!camera.isIdentity)
+        XCTAssertTrue(CameraState().isIdentity)
+        var mirror = CameraState(focus: CGPoint(x: 500, y: 300)); mirror.flipX = true
+        XCTAssertEqual(CGPoint(x: 100, y: 50).applying(mirror.transform), CGPoint(x: 900, y: 50))
+    }
+
     func testMinimalScriptUsesDefaults() throws {
         let film = try script(#"{"steps":[{"action":"wait","duration":0.2}]}"#)
         try film.validate()
@@ -83,6 +130,28 @@ final class ScriptTests {
         video.width = 1920; video.height = 1082; video.fps = 60
         canvas.browserTheme = "dark"
         XCTAssertEqual(try video.fitted(to: canvas), video)
+    }
+
+    func testBackdropAndGlowSettingsPreserveOldCanvases() throws {
+        var canvas = try JSONDecoder().decode(CanvasSpec.self, from: Data(#"{"backdrop":"mist"}"#.utf8))
+        XCTAssertTrue(!canvas.glow)
+        XCTAssertEqual(canvas.glowRadius, 0.75); XCTAssertEqual(canvas.glowSize, 0.3)
+        canvas.glow = true; canvas.glowRadius = 1.1; canvas.glowSize = 0.6
+        for style in CanvasSpec.backdrops {
+            canvas.backdrop = style
+            try canvas.validate()
+            XCTAssertEqual(try JSONDecoder().decode(CanvasSpec.self, from: JSONEncoder().encode(canvas)), canvas)
+        }
+        for radius in [0, 1.51, Double.infinity, Double.nan] {
+            var invalid = canvas; invalid.glowRadius = radius
+            XCTAssertThrowsError(try invalid.validate())
+        }
+        for size in [-0.01, 1.01, Double.infinity, Double.nan] {
+            var invalid = canvas; invalid.glowSize = size
+            XCTAssertThrowsError(try invalid.validate())
+        }
+        canvas.backdrop = "unknown"
+        XCTAssertThrowsError(try canvas.validate())
     }
 
     func testDeviceFramesScaleContentWithCanvas() throws {

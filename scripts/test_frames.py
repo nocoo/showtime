@@ -54,9 +54,9 @@ def main():
     try:
         mcp.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "frame-check", "version": "1"}})
         mcp.call("showtime_studio", mode="studio", inspector="Frame", showInspector=True, theme="light")
-        mcp.call("showtime_settings", canvas={"width": 1920, "height": 1080, "inset": 32, "frame": "none", "contentWidth": None, "browserTheme": "light"},
+        mcp.call("showtime_settings", canvas={"width": 1920, "height": 1080, "inset": 32, "frame": "none", "contentWidth": None, "browserTheme": "light", "backdrop": "mist"},
                  video={"width": 1920, "height": 1080, "fps": 30})
-        mcp.call("showtime_open", url="showtime://demo")
+        mcp.call("showtime_design", step={"action": "open", "url": "showtime://demo"})
         cases = [("none", 1856, 960, 1016), ("iphone-16-pro", 402, 790, 898),
                  ("iphone-16-pro-max", 440, 872, 980),
                  ("ipad-pro-11", 834, 1148, 1238), ("ipad-pro-13", 1032, 1330, 1420),
@@ -122,26 +122,24 @@ def main():
             assert client.request("GET", "/v1/settings") == stable
         check("Invalid widths and incompatible frame/Canvas changes leave all settings unchanged")
 
-        mcp.call("showtime_settings", canvas={"frame": "none", "inset": 0})
+        mcp.call("showtime_settings", canvas={"frame": "none", "inset": 0, "browserTheme": "light"})
         wait_viewport(2000, 2000 * (2160 - 56) / 3840)
-        evaluate("""(() => {
-          const layer = document.createElement('div'); layer.id='content-width-paint';
-          layer.style='position:fixed;inset:0;background:#d000ff;z-index:2147483647;pointer-events:none';
-          document.body.append(layer); return true;
-        })()""")
+        assert_page("!!document.querySelector('#revenue-chart') && document.documentElement.scrollWidth === innerWidth")
         wide, narrow = output / "content-wide.png", output / "content-narrow.png"
         client.request("POST", "/v1/screenshot", {"output": str(wide)})
         mcp.call("showtime_settings", canvas={"contentWidth": 1000})
         wait_viewport(1000, 1000 * (2160 - 56) / 3840)
+        assert_page("!!document.querySelector('#revenue-chart') && document.documentElement.scrollWidth === innerWidth")
         client.request("POST", "/v1/screenshot", {"output": str(narrow)})
+        # This point is on the wide browser's light title bar, outside the narrower window.
+        # Keep Orbit intact so both artifacts also show the real responsive dashboard.
         def sample(path):
-            return subprocess.check_output(["ffmpeg", "-v", "error", "-i", str(path), "-vf", "crop=1:1:1200:1080",
+            return subprocess.check_output(["ffmpeg", "-v", "error", "-i", str(path), "-vf", "crop=1:1:1200:526",
                                             "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"])
         before, after = sample(wide), sample(narrow)
-        assert before[0] > 180 and before[1] < 30 and before[2] > 220
-        assert after[1] > 150, "Shrinking content must replace the previous window and page with backdrop"
-        evaluate("(() => { document.querySelector('#content-width-paint').remove(); return true; })()")
-        check("Fixed width ignores inset and refreshes exported window geometry and margins")
+        assert min(before) > 235
+        assert sum(abs(a - b) for a, b in zip(before, after)) > 25, "Shrinking content must replace the previous window with backdrop"
+        check("Fixed width reflows Orbit and refreshes exported window geometry and margins without changing the page")
 
         for argument, expected in [("1200", 1200), ("auto", None)]:
             settings = json.loads(subprocess.check_output([sys.executable, str(Path(__file__).with_name("showtime_cli.py")),
@@ -212,18 +210,20 @@ def main():
             mcp.call("showtime_settings", canvas={"frame": frame, "browserTheme": "light", "contentWidth": 2000 if frame.startswith("macbook") else None})
             time.sleep(0.2)
             mcp.call("showtime_studio", mode="theater")
-            mcp.call("showtime_record", operation="start", output=str(movie))
+            take = mcp.call("showtime_record", output=str(movie), script={"steps": [
+                {"action": "caption", "text": "A frame for every story.", "duration": 2},
+                {"action": "click", "selector": "#new-project", "duration": 0.3},
+                {"action": "key", "key": "escape"},
+                {"action": "wait", "duration": 0.8}]})
             try:
                 client.request("POST", "/v1/settings", {"canvas": {"frame": "none"}})
             except ShowtimeError as error:
                 assert "409" in str(error)
             else:
                 raise AssertionError("Frame changed during recording")
-            mcp.call("showtime_act", step={"action": "caption", "text": "A frame for every story.", "duration": 2})
-            mcp.call("showtime_act", step={"action": "click", "selector": "#new-project", "duration": 0.3})
-            mcp.call("showtime_act", step={"action": "key", "key": "escape"})
-            mcp.call("showtime_act", step={"action": "wait", "duration": 0.8})
-            result = mcp.call("showtime_record", operation="stop")
+            job = mcp.call("showtime_job", id=take["job"], wait=True)
+            assert job["status"] == "completed"
+            result = next(item["recording"] for item in job["results"] if "recording" in item)
             probe = json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries",
                 "stream=codec_name,width,height,r_frame_rate:format=duration", "-of", "json", str(movie)]))
             stream = probe["streams"][0]

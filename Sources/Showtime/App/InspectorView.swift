@@ -64,8 +64,8 @@ struct InspectorView: View {
         Group {
             CaptureControls(model: model, section: .canvas)
             InspectorSection(title: "Backdrop", symbol: "photo.on.rectangle.angled") {
-                HStack(spacing: 9) {
-                    ForEach(["mist", "pearl", "midnight"], id: \.self) { style in
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 9), count: 3), spacing: 12) {
+                    ForEach(CanvasSpec.backdrops, id: \.self) { style in
                         Button {
                             var canvas = model.canvas; canvas.backdrop = style
                             do { try model.applyCapture(canvas: canvas) }
@@ -76,7 +76,7 @@ struct InspectorView: View {
                                     FilmBackdrop(style: style).clipShape(RoundedRectangle(cornerRadius: 9))
                                     RoundedRectangle(cornerRadius: 3).fill(.white.opacity(0.85))
                                         .frame(width: 34, height: 23).shadow(color: .black.opacity(0.12), radius: 4, y: 2)
-                                }.frame(height: 52)
+                                }.frame(height: 42)
                                     .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(model.canvas.backdrop == style ? Theme.accent : Theme.line,
                                                                                          lineWidth: model.canvas.backdrop == style ? 1.8 : 0.75))
                                 Text(style.capitalized).font(.system(size: 12, weight: model.canvas.backdrop == style ? .semibold : .regular))
@@ -102,6 +102,25 @@ struct InspectorView: View {
                         .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
                 }
             }
+            InspectorSection(title: "Soft glow", symbol: "sun.max") {
+                inspectorToggle("Center glow", isOn: canvasBinding(\.glow))
+                if model.canvas.glow {
+                    VStack(spacing: 8) {
+                        infoRow("Radius", value: "\(Int((model.canvas.glowRadius * 100).rounded()))%")
+                        Slider(value: canvasBinding(\.glowRadius), in: 0.1...1.5, step: 0.05)
+                            .controlSize(.small).accessibilityLabel("Glow radius")
+                            .help("How far the soft edge fades beyond the center")
+                    }
+                    VStack(spacing: 8) {
+                        infoRow("Core size", value: "\(Int((model.canvas.glowSize * 100).rounded()))%")
+                        Slider(value: canvasBinding(\.glowSize), in: 0...1, step: 0.05)
+                            .controlSize(.small).accessibilityLabel("Glow core size")
+                            .help("Size of the bright center")
+                    }
+                    Text("A gentle light behind the frame, adapted to its appearance.")
+                        .font(.system(size: 12)).foregroundStyle(Theme.muted).lineSpacing(3)
+                }
+            }.disabled(model.isBusy)
             InspectorSection(title: "Browser identity", symbol: "globe") {
                 labeledField("Display title", placeholder: "Use page title", text: $model.titleOverride)
                 labeledField("Display address", placeholder: "Use real URL", text: $model.urlOverride)
@@ -250,14 +269,38 @@ struct InspectorView: View {
             }
             Slider(value: Binding(get: { effects.camera.scale }, set: {
                 effects.camera.scale = $0; model.browser.surface?.updateCamera()
-            }), in: 1...3).controlSize(.small).accessibilityLabel("Camera close-up")
+            }), in: 0.25...4).controlSize(.small).accessibilityLabel("Camera close-up")
+            HStack {
+                Text("Offset").font(.system(size: 13))
+                Spacer()
+                Button("Center") {
+                    effects.camera.offset = .zero; model.browser.surface?.updateCamera()
+                }.buttonStyle(.plain).font(.system(size: 12)).foregroundStyle(Theme.accent)
+                    .disabled(effects.camera.offset == .zero).accessibilityLabel("Center camera offset")
+            }
+            CameraOffsetPad(offset: Binding(get: { effects.camera.offset }, set: {
+                effects.camera.offset = $0; model.browser.surface?.updateCamera()
+            }), range: CGSize(width: model.canvas.pageWidth / 2, height: model.canvas.pageHeight / 2))
+            HStack {
+                Text(String(format: "X %+.0f", effects.camera.offset.x))
+                Spacer()
+                Text(String(format: "Y %+.0f px", effects.camera.offset.y))
+            }.font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.muted)
             Button {
                 effects.camera = CameraState(scale: 1, focus: CGPoint(x: model.canvas.pageWidth / 2, y: model.canvas.pageHeight / 2))
                 model.browser.surface?.updateCamera()
             } label: {
                 Label("Reset camera", systemImage: "arrow.uturn.backward").font(.system(size: 12, weight: .medium))
-            }.buttonStyle(.plain).foregroundStyle(Theme.accent)
-        }.disabled(model.isPlaying)
+            }.buttonStyle(.plain).foregroundStyle(Theme.accent).disabled(effects.camera.isIdentity)
+        }.disabled(model.isPlaying || model.isPreparing || model.isFinishing)
+    }
+
+    private func canvasBinding<Value>(_ keyPath: WritableKeyPath<CanvasSpec, Value>) -> Binding<Value> {
+        Binding(get: { model.canvas[keyPath: keyPath] }, set: { value in
+            var canvas = model.canvas; canvas[keyPath: keyPath] = value
+            do { try model.applyCapture(canvas: canvas) }
+            catch { model.report(error) }
+        })
     }
 
     private var cursorControls: some View {
@@ -343,9 +386,8 @@ struct InspectorView: View {
     }
 
     private func placePointer() {
-        let camera = effects.camera
-        effects.pointer.point = CGPoint(x: (model.canvas.pageWidth / 2 - camera.focus.x) / camera.scale + camera.focus.x,
-                                        y: (model.canvas.pageHeight / 2 - camera.focus.y) / camera.scale + camera.focus.y)
+        effects.pointer.point = CGPoint(x: model.canvas.pageWidth / 2, y: model.canvas.pageHeight / 2)
+            .applying(effects.camera.transform.inverted())
         effects.pointer.visible = true
     }
 
@@ -412,5 +454,68 @@ struct InspectorView: View {
             Text(title).font(.system(size: 13)); Spacer()
             Toggle(title, isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
+    }
+}
+
+private struct CameraOffsetPad: View {
+    @Binding var offset: CGPoint
+    let range: CGSize
+    @FocusState private var focused: Bool
+    @Environment(\.isEnabled) private var enabled
+
+    var body: some View {
+        GeometryReader { geometry in
+            let half = CGSize(width: max(1, geometry.size.width / 2 - 14), height: max(1, geometry.size.height / 2 - 14))
+            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            let point = CGPoint(x: center.x + min(1, max(-1, offset.x / range.width)) * half.width,
+                                y: center.y + min(1, max(-1, offset.y / range.height)) * half.height)
+            ZStack {
+                RoundedRectangle(cornerRadius: 11).fill(Theme.field)
+                Path { path in
+                    path.move(to: CGPoint(x: 14, y: center.y)); path.addLine(to: CGPoint(x: geometry.size.width - 14, y: center.y))
+                    path.move(to: CGPoint(x: center.x, y: 14)); path.addLine(to: CGPoint(x: center.x, y: geometry.size.height - 14))
+                }.stroke(Theme.line, style: StrokeStyle(lineWidth: 0.75, dash: [3, 4]))
+                Circle().strokeBorder(Theme.muted.opacity(0.3), lineWidth: 1).frame(width: 6, height: 6).position(center)
+                Circle().fill(Theme.accent.opacity(0.12)).frame(width: 26, height: 26).position(point)
+                Circle().fill(Theme.accent).frame(width: 9, height: 9).position(point)
+            }
+            .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(focused ? Theme.accent.opacity(0.65) : Theme.line, lineWidth: 0.75))
+            .contentShape(RoundedRectangle(cornerRadius: 11))
+            .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                guard enabled else { return }
+                focused = true
+                offset = CGPoint(x: (min(1, max(-1, (value.location.x - center.x) / half.width)) * range.width).rounded(),
+                                 y: (min(1, max(-1, (value.location.y - center.y) / half.height)) * range.height).rounded())
+            })
+        }
+        .frame(height: 108).opacity(enabled ? 1 : 0.45).focusable(enabled).focused($focused).focusEffectDisabled()
+        .onMoveCommand { direction in
+            switch direction {
+            case .left: move(x: -10)
+            case .right: move(x: 10)
+            case .up: move(y: -10)
+            case .down: move(y: 10)
+            @unknown default: break
+            }
+        }
+        .onKeyPress(.space) {
+            guard enabled else { return .ignored }
+            offset = .zero; return .handled
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Camera offset")
+        .accessibilityValue(String(format: "Horizontal %+.0f pixels, vertical %+.0f pixels", offset.x, offset.y))
+        .accessibilityHint("Click or drag to move. Arrow keys adjust by 10 pixels. Space centers the camera.")
+        .accessibilityAction(named: Text("Move left")) { move(x: -10) }
+        .accessibilityAction(named: Text("Move right")) { move(x: 10) }
+        .accessibilityAction(named: Text("Move up")) { move(y: -10) }
+        .accessibilityAction(named: Text("Move down")) { move(y: 10) }
+        .accessibilityAction(named: Text("Center offset")) { if enabled { offset = .zero } }
+    }
+
+    private func move(x: Double = 0, y: Double = 0) {
+        guard enabled else { return }
+        offset = CGPoint(x: min(range.width, max(-range.width, offset.x + x)),
+                         y: min(range.height, max(-range.height, offset.y + y)))
     }
 }

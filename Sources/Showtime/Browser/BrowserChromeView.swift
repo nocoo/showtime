@@ -10,7 +10,8 @@ struct BrowserChromeView: View {
     private var palette: FilmChromePalette { FilmChromePalette(dark: model.canvas.browserTheme == "dark") }
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
+            BrowserNavigationControls(model: model, exporting: exporting, ink: palette.ink)
             HStack(spacing: 8) {
                 if let favicon = model.favicon {
                     Image(nsImage: favicon).resizable().interpolation(.high).scaledToFit()
@@ -35,7 +36,7 @@ struct BrowserChromeView: View {
                         .accessibilityLabel("Website address")
                 } else {
                     Button {
-                        guard !model.isPlaying else { return }
+                        guard model.canNavigate else { return }
                         address = model.actualURL
                         focused = true
                     } label: {
@@ -50,11 +51,8 @@ struct BrowserChromeView: View {
             .background(palette.field, in: RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(palette.line, lineWidth: 0.7))
             .frame(minWidth: 200, maxWidth: 690)
-            chromeButton(model.isLoading && !exporting ? "xmark" : "arrow.clockwise",
-                         label: model.isLoading ? "Stop loading" : "Reload page · ⌘R", disabled: model.isPlaying && !exporting) {
-                if model.isLoading { model.browser.webView.stopLoading() }
-                else { model.browser.webView.reload() }
-            }
+            chromeButton("arrow.clockwise", label: "Reload page · ⌘R",
+                         disabled: model.isLoading || (!model.canNavigate && !exporting), action: model.reloadPage)
         }
         .padding(.horizontal, 18).frame(height: CanvasSpec.chromeHeight)
         .background(palette.surface)
@@ -78,6 +76,29 @@ struct BrowserChromeView: View {
             Image(systemName: symbol).font(.system(size: 12, weight: .medium))
                 .foregroundStyle(palette.ink.opacity(disabled ? 0.2 : 0.65))
                 .frame(width: 28, height: 34).contentShape(RoundedRectangle(cornerRadius: 7))
+        }.buttonStyle(.plain).disabled(disabled).help(label).accessibilityLabel(label)
+    }
+}
+
+struct BrowserNavigationControls: View {
+    @ObservedObject var model: StudioModel
+    var exporting = false
+    var ink: Color = Theme.ink
+
+    var body: some View {
+        HStack(spacing: 2) {
+            button("chevron.left", label: "Back", available: model.canGoBack) { model.navigateHistory(forward: false) }
+            button("chevron.right", label: "Forward", available: model.canGoForward) { model.navigateHistory(forward: true) }
+            button("xmark", label: "Stop loading", available: model.isLoading, action: model.stopLoading)
+        }.allowsHitTesting(!exporting)
+    }
+
+    private func button(_ symbol: String, label: String, available: Bool, action: @escaping () -> Void) -> some View {
+        let disabled = !available || (!exporting && !model.canNavigate)
+        return Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ink.opacity(disabled ? 0.2 : 0.62))
+                .frame(width: 22, height: 30).contentShape(RoundedRectangle(cornerRadius: 5))
         }.buttonStyle(.plain).disabled(disabled).help(label).accessibilityLabel(label)
     }
 }

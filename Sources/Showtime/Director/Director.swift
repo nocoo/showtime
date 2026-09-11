@@ -8,6 +8,17 @@ struct JobRecord {
     var status = "running"
     var step = 0
     var total: Int
+    var mode: PlaybackMode = .rehearse
+    var phase = "preparing"
+    var completed = 0
+    var from = 1
+    var to = 1
+    var scriptTotal = 1
+    var setupStep = 0
+    var setupTotal = 0
+    var screenshot: String?
+    var current: Action?
+    var cueStarted: Date?
     var started = Date()
     var finished: Date?
     var error: String?
@@ -16,10 +27,22 @@ struct JobRecord {
 
     var json: [String: Any] {
         var value: [String: Any] = ["id": id, "name": name, "status": status, "step": step, "total": total,
+                                    "mode": mode.rawValue, "phase": phase, "completed": completed,
+                                    "range": ["from": from, "to": to, "scriptSteps": scriptTotal],
+                                    "setup": ["step": setupStep, "total": setupTotal],
+                                    "elapsed": max(0, (finished ?? Date()).timeIntervalSince(started)),
                                     "started": ISO8601DateFormatter().string(from: started), "results": results]
         if let finished { value["finished"] = ISO8601DateFormatter().string(from: finished) }
         if let error { value["error"] = error }
         if let output { value["output"] = output }
+        if let screenshot { value["screenshot"] = screenshot }
+        if let current {
+            var cue: [String: Any] = ["action": current.action.rawValue, "label": current.displayLabel,
+                                       "elapsed": max(0, (finished ?? Date()).timeIntervalSince(cueStarted ?? started))]
+            if let id = current.id { cue["id"] = id }
+            if let duration = current.duration { cue["duration"] = duration }
+            value["current"] = cue
+        }
         return value
     }
 }
@@ -35,20 +58,32 @@ final class Director {
     init(model: StudioModel) { self.model = model }
 
     @discardableResult
-    func run(_ script: FilmScript, singleAction: Bool = false, source: DirectorActivitySource = .local) throws -> String {
+    func run(_ original: FilmScript, singleAction: Bool = false, source: DirectorActivitySource = .local,
+             mode requestedMode: PlaybackMode? = nil, range requestedRange: Range<Int>? = nil, screenshot: String? = nil) throws -> String {
+        var script = original
+        let mode = requestedMode ?? (singleAction ? .design : script.recording == nil ? .rehearse : .record)
+        if mode != .record { script.recording = nil }
         try script.validate(defaultCanvas: model.canvas)
-        guard !model.isPlaying, !model.isFinishing, !model.isPreparing else { throw ShowtimeError("The director is busy. Wait for the current job or stop it first.") }
-        guard !(model.isRecording && script.recording != nil) else { throw ShowtimeError("A recording is already in progress.") }
-        guard !(model.isRecording && script.canvas != nil && script.canvas != model.canvas) else {
-            throw ShowtimeError("Canvas dimensions cannot change during a recording.")
+        guard !model.isBusy else { throw ShowtimeError("The director is busy. Wait for the current job or stop it first.") }
+        if mode == .design, script.steps.count != 1 || !script.setup.isEmpty {
+            throw ShowtimeError("Design previews accept one action. Use rehearse or record for scripts.")
         }
-        if !singleAction {
+        let range = requestedRange ?? script.steps.indices
+        guard !range.isEmpty, range.lowerBound >= 0, range.upperBound <= script.steps.count else { throw ShowtimeError("Invalid playback range.") }
+        if mode == .record {
+            var recording = try script.recording ?? model.recordingSettings.fitted(to: script.canvas ?? model.canvas)
+            recording.output = try OutputFiles.newURL(path: recording.output, defaultFolder: model.exportFolder, ext: "mp4").path
+            script.recording = recording
+        }
+        if let screenshot { _ = try OutputFiles.newURL(path: screenshot, defaultFolder: model.exportFolder, ext: "png") }
+        if mode != .design {
             try model.stageScript(script)
             model.effects.reset(pageSize: model.pageSize)
         } else if script.steps.first?.action == .open {
             model.clearStoryboard()
         }
-        let job = JobRecord(name: script.name, total: script.steps.count)
+        let job = JobRecord(name: script.name, total: range.count, mode: mode, from: range.lowerBound + 1,
+                            to: range.upperBound, scriptTotal: script.steps.count, setupTotal: script.setup.count)
         if jobs.count >= 40, let oldest = jobs.values.filter({ $0.status != "running" }).min(by: { $0.started < $1.started }) { jobs.removeValue(forKey: oldest.id) }
         jobs[job.id] = job
         currentJobID = job.id
@@ -56,9 +91,10 @@ final class Director {
         model.errorMessage = nil
         model.toasts.dismiss()
         if model.mode == .director { model.mode = .theater }
-        model.activity.begin(script, id: job.id, source: source, singleAction: singleAction)
+        model.playbackMode = mode
+        model.activity.begin(script, id: job.id, source: source, mode: mode, range: range)
         model.isPlaying = true
-        task = Task { @MainActor in await self.execute(script, jobID: job.id, singleAction: singleAction) }
+        task = Task { @MainActor in await self.execute(script, jobID: job.id, mode: mode, range: range, screenshot: screenshot) }
         return job.id
     }
 
@@ -66,38 +102,60 @@ final class Director {
     func abort(_ error: Error) { abortError = error; cancel() }
     func waitUntilStopped() async { await task?.value }
 
-    private func execute(_ script: FilmScript, jobID: String, singleAction: Bool) async {
+    private func execute(_ script: FilmScript, jobID: String, mode: PlaybackMode, range: Range<Int>, screenshot: String?) async {
         var ownsRecording = false
         do {
             if script.canvas != nil {
                 try await Task.sleep(for: .milliseconds(180))
                 model.browser.surface?.layoutSubtreeIfNeeded()
             }
-            var startIndex = 0
+            for (index, step) in script.setup.enumerated() {
+                try Task.checkCancellation()
+                jobs[jobID]?.phase = "setup"
+                jobs[jobID]?.setupStep = index + 1
+                jobs[jobID]?.current = step
+                jobs[jobID]?.cueStarted = Date()
+                model.statusText = "Setup · \(step.displayLabel)"
+                model.activity.beginSetup(step, index: index, jobID: jobID)
+                let started = CACurrentMediaTime()
+                let value = try await perform(step)
+                var result: [String: Any] = ["phase": "setup", "step": index + 1, "action": step.action.rawValue,
+                                            "label": step.displayLabel, "duration": CACurrentMediaTime() - started]
+                if let id = step.id { result["id"] = id }
+                if let value { result["value"] = value }
+                jobs[jobID]?.results.append(result)
+            }
+            var startIndex = range.lowerBound
             // Navigation is preparation, so a recorded film opens on a fully rendered first frame.
-            if script.recording != nil, script.steps.first?.action == .open {
-                try await runStep(script.steps[0], index: 0, script: script, jobID: jobID)
+            if script.recording != nil, startIndex == 0, script.steps.first?.action == .open {
+                try await runStep(script.steps[0], index: 0, script: script, range: range, jobID: jobID)
                 startIndex = 1
             }
             if let recording = script.recording {
+                try Task.checkCancellation()
+                jobs[jobID]?.phase = "preparing"
                 try await model.recorder.start(recording)
                 ownsRecording = true
             }
-            for index in startIndex..<script.steps.count {
+            jobs[jobID]?.phase = "running"
+            for index in startIndex..<range.upperBound {
                 try Task.checkCancellation()
-                try await runStep(script.steps[index], index: index, script: script, jobID: jobID)
+                try await runStep(script.steps[index], index: index, script: script, range: range, jobID: jobID)
             }
+            if let screenshot { jobs[jobID]?.screenshot = try await model.screenshot(to: screenshot).path }
             if ownsRecording {
-                let result = try await model.recorder.stop()
+                jobs[jobID]?.phase = "saving"
+                let result = try await Task { @MainActor in try await self.model.recorder.stop() }.value
                 jobs[jobID]?.output = result.url.path
                 jobs[jobID]?.results.append(["recording": result.json])
             }
             jobs[jobID]?.status = "completed"
-            model.statusText = ownsRecording ? "A good take. Ready to share." : singleAction
-                ? (script.steps.first?.action == .open ? "Website ready" : "Action complete") : "Rehearsal complete"
+            model.statusText = ownsRecording ? "A good take. Ready to share." : mode == .design ? "Design preview ready" : "Rehearsal complete"
         } catch {
             let cancelled = error is CancellationError && abortError == nil
+            let failurePhase = jobs[jobID]?.phase
             if ownsRecording && model.isRecording {
+                jobs[jobID]?.phase = "saving"
                 // Finish on a fresh, uncancelled task so an interrupted take is still a playable MP4.
                 let result = await Task { @MainActor in try? await self.model.recorder.stop() }.value
                 jobs[jobID]?.output = result?.url.path
@@ -106,12 +164,17 @@ final class Director {
             jobs[jobID]?.status = cancelled ? "cancelled" : "failed"
             if !cancelled {
                 let failure = abortError ?? error
-                jobs[jobID]?.error = failure.localizedDescription
+                let job = jobs[jobID]!
+                let position = failurePhase == "setup" ? "Setup \(job.setupStep)" : "Step \(job.step)"
+                let cue = job.current.map { " (\($0.id ?? $0.action.rawValue))" } ?? ""
+                jobs[jobID]?.error = "\(position)\(cue): \(failure.localizedDescription)"
                 model.report(failure)
             } else { model.statusText = "Take stopped" }
         }
         jobs[jobID]?.finished = Date()
-        let finalPhase: DirectorActivityPhase = jobs[jobID]?.status == "completed" ? .completed : jobs[jobID]?.status == "cancelled" ? .stopped : .failed
+        let status = jobs[jobID]?.status ?? "failed"
+        jobs[jobID]?.phase = status
+        let finalPhase: DirectorActivityPhase = status == "completed" ? .completed : status == "cancelled" ? .stopped : .failed
         model.activity.finish(finalPhase, output: jobs[jobID]?.output)
         if let output = jobs[jobID]?.output, let job = jobs[jobID] {
             let sidecar = URL(fileURLWithPath: output).deletingPathExtension().appendingPathExtension("json")
@@ -124,18 +187,22 @@ final class Director {
         task = nil
     }
 
-    private func runStep(_ step: Action, index: Int, script: FilmScript, jobID: String) async throws {
-        model.activity.beginCue(step, index: index, script: script, jobID: jobID)
+    private func runStep(_ step: Action, index: Int, script: FilmScript, range: Range<Int>, jobID: String) async throws {
+        model.activity.beginCue(step, index: index, script: script, range: range, jobID: jobID)
         model.currentStep = index
         model.statusText = step.displayLabel
         jobs[jobID]?.step = index + 1
+        jobs[jobID]?.current = step
+        jobs[jobID]?.cueStarted = Date()
         let started = CACurrentMediaTime()
         let value = try await perform(step)
-        var result: [String: Any] = ["step": index + 1, "action": step.action.rawValue, "label": step.displayLabel,
+        var result: [String: Any] = ["phase": "steps", "step": index + 1, "action": step.action.rawValue, "label": step.displayLabel,
                                      "duration": CACurrentMediaTime() - started]
+        if let id = step.id { result["id"] = id }
         if let value { result["value"] = value }
         jobs[jobID]?.results.append(result)
-        model.activity.completeCue(index: index)
+        jobs[jobID]?.completed += 1
+        model.activity.completeCue(completed: jobs[jobID]?.completed ?? 0)
     }
 
     func perform(_ step: Action) async throws -> Any? {
@@ -221,23 +288,29 @@ final class Director {
                 guard CACurrentMediaTime() < deadline else { throw ShowtimeError("Timed out waiting for \(step.selector ?? "the JavaScript condition").") }
                 try await Task.sleep(for: .milliseconds(80))
             }
-        case .zoom:
+        case .zoom, .camera:
             let start = effects.camera
-            let targetScale = step.scale ?? 1
-            let focus: CGPoint
-            if step.selector != nil || step.x != nil { focus = try await target(step) }
-            else { focus = start.focus }
-            if targetScale > 1, start.scale <= 1.001 {
+            var end = start
+            end.scale = step.scale ?? (step.action == .zoom ? 1 : start.scale)
+            if step.selector != nil || step.x != nil { end.focus = try await target(step) }
+            end.offset = CGPoint(x: step.offsetX ?? start.offset.x, y: step.offsetY ?? start.offset.y)
+            end.rotation = step.rotation ?? start.rotation
+            end.flipX = step.flipX ?? start.flipX; end.flipY = step.flipY ?? start.flipY
+            if !end.isIdentity, start.isIdentity {
                 let image = try await browser.snapshot()
                 browser.surface?.updateCamera(image: image)
             }
             try await animate(duration: step.duration ?? 1, curve: step.easing) { p in
-                effects.camera = CameraState(scale: start.scale + (targetScale - start.scale) * p,
-                    focus: CGPoint(x: start.focus.x + (focus.x - start.focus.x) * p, y: start.focus.y + (focus.y - start.focus.y) * p))
+                var frame = end
+                frame.scale = start.scale + (end.scale - start.scale) * p
+                frame.focus = CGPoint(x: start.focus.x + (end.focus.x - start.focus.x) * p, y: start.focus.y + (end.focus.y - start.focus.y) * p)
+                frame.offset = CGPoint(x: start.offset.x + (end.offset.x - start.offset.x) * p, y: start.offset.y + (end.offset.y - start.offset.y) * p)
+                frame.rotation = start.rotation + (end.rotation - start.rotation) * p
+                effects.camera = frame
                 browser.surface?.updateCamera()
             }
         case .caption:
-            effects.showCaption(step)
+            effects.showCaption(step, held: model.isDesigning)
         case .cursor:
             if let style = step.style { effects.pointer.style = style }
             if let size = step.size { effects.pointer.size = size }

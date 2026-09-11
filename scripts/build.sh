@@ -58,7 +58,7 @@ fi
 cp "$SHOWTIME_ROOT/scripts/Info.plist" "$SHOWTIME_STAGED_APP/Contents/Info.plist"
 ditto "$SHOWTIME_BIN/Showtime_Showtime.bundle" "$SHOWTIME_STAGED_APP/Contents/Resources/Showtime_Showtime.bundle"
 cp "$SHOWTIME_ROOT/LICENSE" "$SHOWTIME_STAGED_APP/Contents/Resources/LICENSE"
-cp "$SHOWTIME_ROOT/scripts/showtime" "$SHOWTIME_ROOT/scripts/showtime_cli.py" "$SHOWTIME_ROOT/scripts/showtime_client.py" "$SHOWTIME_ROOT/scripts/showtime_mcp.py" "$SHOWTIME_ROOT/scripts/showtime_version.py" "$SHOWTIME_ROOT/package.json" "$SHOWTIME_STAGED_APP/Contents/Resources/Tools/"
+cp "$SHOWTIME_ROOT/scripts/showtime" "$SHOWTIME_ROOT/scripts/showtime_cli.py" "$SHOWTIME_ROOT/scripts/showtime_client.py" "$SHOWTIME_ROOT/scripts/showtime_mcp.py" "$SHOWTIME_ROOT/scripts/showtime_schema.py" "$SHOWTIME_ROOT/scripts/showtime_version.py" "$SHOWTIME_ROOT/skills/showtime/SKILL.md" "$SHOWTIME_ROOT/package.json" "$SHOWTIME_STAGED_APP/Contents/Resources/Tools/"
 chmod +x "$SHOWTIME_STAGED_APP/Contents/Resources/Tools/showtime" "$SHOWTIME_STAGED_APP/Contents/Resources/Tools/showtime_mcp.py"
 iconutil -c icns "$SHOWTIME_ROOT/.build/Showtime.iconset" -o "$SHOWTIME_STAGED_APP/Contents/Resources/Showtime.icns"
 SHOWTIME_SIGN_OPTIONS=(--force --sign "$SHOWTIME_SIGN_IDENTITY")

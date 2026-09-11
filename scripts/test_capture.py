@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check real-page capture settings, MP4 output, and live MCP direction in Showtime."""
+"""Check real-page capture settings, MP4 output, and MCP script playback in Showtime."""
 from __future__ import annotations
 
 import argparse
@@ -76,7 +76,7 @@ def main():
         mcp.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "capture-check", "version": "1"}})
         names = {tool["name"] for tool in mcp.request("tools/list", {})["tools"]}
         assert {"showtime_settings", "showtime_studio", "showtime_record"} <= names
-        mcp.call("showtime_open", url=args.url)
+        mcp.call("showtime_design", step={"action": "open", "url": args.url})
         opened = client.status()
         actual_url = opened["url"]
         assert opened["storyboard"]["cues"] == 0
@@ -119,17 +119,22 @@ def main():
                                "y": window["frame"]["height"] - 26})
                 wait_for(lambda state: state["recording"])
             else:
-                mcp.call("showtime_record", operation="start", output=str(movie))
+                take = mcp.call("showtime_record", script={"steps": [{"action": "wait", "duration": 2}]}, output=str(movie))
+                wait_for(lambda state: state["recording"])
             recording = client.status()
-            assert recording["recording"] and not recording["playing"] and recording["url"] == actual_url
+            assert recording["recording"] and recording["playing"] == (index != 0) and recording["url"] == actual_url
             if index == 0:
                 client.request("POST", "/v1/studio/screenshot", {"output": str(output / "studio-recording.png")})
             try: client.request("POST", "/v1/settings", {"video": {"fps": 30}})
             except ShowtimeError as error: assert "409" in str(error)
             else: raise AssertionError("Settings changed during a take.")
             time.sleep(0.9)
-            result = mcp.call("showtime_record", operation="stop")
-            if index == 0: shutil.copyfile(result["output"], movie)
+            if index == 0:
+                result = client.request("POST", "/v1/recording/stop", {})
+                shutil.move(result["output"], movie)
+            else:
+                result = mcp.call("showtime_job", id=take["job"], wait=True)
+                assert result["status"] == "completed"
             probe = json.loads(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                                                         "stream=codec_name,width,height,r_frame_rate,nb_frames:format=duration",
                                                         "-of", "json", str(movie)]))
@@ -148,7 +153,7 @@ def main():
                 {"action": "caption", "text": "A real website. A directed film.", "duration": 4},
                 {"action": "wait", "duration": 2}]},
             {"action": "wait", "label": "Let the closing frame breathe", "duration": 0.3}]}
-        job = mcp.call("showtime_run", script=script, rehearse=True)
+        job = mcp.call("showtime_rehearse", script=script)
         live = wait_for(lambda state: state["director"].get("current", {}).get("title") == "Bring the story into focus")["director"]
         assert live["source"] == "agent" and live["phase"] == "working" and live["scene"] == "The opening scene"
         assert live["next"]["title"] == "Let the closing frame breathe" and live["completed"] == 1

@@ -27,7 +27,7 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 ## 功能
 
 - **真实网页交互** — 打开线上或本地开发页面，用 CSS 选择器或坐标移动、点击、双击、拖拽、滚动和输入；等待元素出现，并检查页面状态。
-- **镜头与画面** — 编排镜头缩放、移动和动态标题，组合并行动作；选择背景、调整画布留白，并单独设置画面中的浏览器标题与地址。Canvas 支持最高 4K（3840 × 2160）预设及自定义尺寸。
+- **镜头与画面** — 用 Camera 触控板叠加缩放与偏移，脚本同步动画过渡；编排动态标题与并行动作。九种背景保留原有绿色，并加入灰色、淡糖果色与可调中心柔光。Canvas 支持最高 4K（3840 × 2160），浏览器顶栏提供轻量前进、后退和停止加载。
 - **设备框架** — 默认 None；支持 iPhone 16 Pro／Pro Max、iPad Pro 11／13 英寸，以及按 2026 款外观重绘的 MacBook Neo 和 MacBook Pro。Light 为银色；Dark 在 Neo 上为靛蓝色，其余设备为深空黑。Content width 可独立指定屏幕宽度，设备按比例居中，留白自动计算；默认 Auto 保留自动适配。按 Export 分辨率采样网页并绘制外框，支持高清 4K 输出。
 - **演示光标** — 使用 macOS 箭头与手型、圆环、圆点、聚光灯或自定义 PNG，调整大小、颜色、热点和点击效果。
 - **可重复剧本** — 用 JSON 保存动作顺序，先排练，再录制。任务返回进度和每一步的结果，支持异步执行与中途停止。
@@ -72,8 +72,10 @@ scripts/run.sh
 运行脚本会构建并打开 `dist/Showtime.app`。使用 CLI 或 MCP 时保持应用运行。完成上面的终端设置后，先用内置 Orbit 剧本排练，再导出第一段演示：
 
 ```sh
-showtime demo --rehearse
-showtime demo --output ~/Movies/Showtime/orbit-launch.mp4
+showtime example > film.json
+showtime validate film.json
+showtime rehearse film.json
+showtime record film.json --output ~/Movies/Showtime/orbit-launch.mp4
 ```
 
 每次导出使用新的文件路径，已有文件不会被覆盖。录制分辨率与画布必须保持相同宽高比。
@@ -84,46 +86,54 @@ showtime demo --output ~/Movies/Showtime/orbit-launch.mp4
 
 | 命令 | 说明 |
 | --- | --- |
+| `showtime guide` / `showtime schema camera` | 读取随 App 安装的 skill、流程和精确 JSON 语法 |
+| `showtime example` | 输出可编辑的 Orbit 剧本 |
 | `showtime status` | 查看页面、镜头、光标、录制与任务状态 |
-| `showtime open http://localhost:3000` | 打开页面；也支持线上 URL 与 `showtime://demo` |
+| `showtime design '{"action":"open","url":"http://localhost:3000"}'` | 设计期间打开页面；也支持线上 URL 与 `showtime://demo` |
 | `showtime settings --frame iphone-16-pro` | 切换设备框架和真实视口；`--frame none` 恢复浏览器 |
 | `showtime settings --content-width 1200` | 固定屏幕内容宽度并居中；`--content-width auto` 恢复自动适配 |
 | `showtime inspect` | 获取可见交互元素的选择器、文字和坐标 |
-| `showtime act '{"action":"click","selector":"#new-project"}'` | 执行单个动作；此例适用于内置 Orbit 页面 |
-| `showtime run film.json --rehearse` | 排练自定义剧本，见下方示例 |
-| `showtime run film.json --output ~/Movies/Showtime/film.mp4` | 执行剧本并录制；加 `--no-wait` 可立即取得任务 ID |
+| `showtime design '{"action":"caption","text":"Hello"}' --screenshot /tmp/preview-new.png` | 预览单个动作并截图；动作 JSON 可直接放入剧本 |
+| `showtime validate film.json` | 执行前校验整个剧本和选定范围 |
+| `showtime rehearse film.json --from feature --to closing` | 按步骤 ID 或从 1 开始的序号排练一段，包含两端 |
+| `showtime record film.json --output ~/Movies/Showtime/film.mp4` | 连续执行脚本并录制；加 `--no-wait` 可立即取得任务 ID |
 | `showtime job JOB_ID` / `showtime wait JOB_ID` | 查询进度或等待完成 |
-| `showtime record start --output ~/Movies/Showtime/take.mp4` | 开始手动或逐步 API 录制；用 `record stop` 完成 |
 | `showtime screenshot ~/Movies/Showtime/frame.png` | 保存包含设备框架、镜头、光标和文字的合成画面 |
 | `showtime stop` | 停止当前任务，并收尾保存已录内容 |
 | `showtime mcp-config` | 输出可直接用于 MCP 客户端的配置 |
 | `showtime mcp` | 启动 MCP stdio bridge，由 MCP 客户端调用 |
 
+设计阶段可以逐个尝试动作。排练、录制必须先写 JSON，所有动作、过渡和等待都由 App 本地执行，不受 Agent 思考和网络往返的影响。`design` 与剧本 `setup` / `steps` 使用相同语法；设计字幕会持续显示供检查，播放时按 `duration` 消失。镜头支持放大、缩小、平移、旋转和水平／垂直镜像。
+
 ### 连接 Agent
 
 运行 `showtime mcp-config`，将输出合并到支持 MCP stdio 的客户端配置中，也可以在 AI Director → Connection details 一键复制。配置通过用户目录中的固定入口启动，自动展开当前用户的 HOME；不包含开发目录、临时下载路径或会话凭据。
 
-MCP 提供 `showtime_status`、`showtime_settings`、`showtime_studio`、`showtime_inspect`、`showtime_open`、`showtime_act`、`showtime_run`、`showtime_job`、`showtime_record` 和 `showtime_screenshot`。典型流程是检查页面元素、规划剧本、排练、验证结果，再录制。
+MCP 提供 `showtime_help`、`showtime_status`、`showtime_settings`、`showtime_studio`、`showtime_inspect`、`showtime_design`、`showtime_validate`、`showtime_rehearse`、`showtime_record`、`showtime_job`、`showtime_stop` 和 `showtime_screenshot`。先调用 `showtime_help` 获取流程；`topic: "script"` 或动作名称返回精确 schema。
+
+AI Director 的 **Copy instructions for your agent** 一键复制创意简报、当前画面设置、连接方式、语法查询命令和完整内置 skill。Agent 无需查找源码。完整流程见 [拍摄指引](docs/directing.md)。
 
 ### 编写剧本
 
-将下面的内容保存为 `film.json`，再使用上面的 `run` 命令：
+将下面的内容保存为 `film.json`，再执行 `showtime rehearse film.json` 和 `showtime record film.json --output /tmp/first-take-new.mp4`：
 
 ```json
 {
   "version": 1,
   "name": "First take",
-  "steps": [
+  "setup": [
     { "action": "open", "url": "showtime://demo" },
-    { "action": "waitFor", "selector": "#new-project" },
-    { "action": "move", "selector": "#new-project", "duration": 0.8 },
+    { "action": "waitFor", "selector": "#new-project" }
+  ],
+  "steps": [
+    { "id": "feature", "action": "move", "selector": "#new-project", "duration": 0.8 },
     { "action": "click", "selector": "#new-project" },
-    { "action": "wait", "duration": 1.5 }
+    { "id": "closing", "action": "wait", "duration": 1.5 }
   ]
 }
 ```
 
-`caption` 不会暂停后续动作，需要展示时长时另加 `wait`。完整示例见[本地产品剧本](examples/local-product.json)、[光标样式](examples/cursor-styles.json)和 [Orbit 演示](Sources/Showtime/Resources/Scripts/orbit-launch.json)。
+每次播放先重置视觉效果并执行 `setup`，准备过程不进入录像。`--from` / `--to` 选择步骤而非视频时间码，不会补跑跳过的步骤；把所需网页状态写在 `setup`。`caption` 不会暂停后续动作，需要展示时长时另加 `wait`。完整示例见[本地产品剧本](examples/local-product.json)、[光标样式](examples/cursor-styles.json)和 [Orbit 演示](Sources/Showtime/Resources/Scripts/orbit-launch.json)。
 
 ## 项目结构
 
@@ -171,6 +181,7 @@ Swift Package Manager 管理构建；根目录 `package.json` 仅保存版本和
 
 ```sh
 python3 scripts/test_integration.py
+python3 scripts/test_workflow.py
 ```
 
 ## 文档
@@ -179,6 +190,7 @@ python3 scripts/test_integration.py
 | --- | --- |
 | [English README](docs/README.en.md) | 英文使用说明 |
 | [剧本示例](examples/) | 本地产品演示与光标配置 |
+| [拍摄指引](docs/directing.md) / [内置 skill](skills/showtime/SKILL.md) | 设计、范围排练、录制、进度和语法发现 |
 | [版本管理](docs/versioning.md) | 版本来源、同步和发布命令 |
 | [变更记录](CHANGELOG.md) | 各版本改动 |
 | [GitHub Releases](https://github.com/nocoo/showtime/releases) | 已发布版本 |

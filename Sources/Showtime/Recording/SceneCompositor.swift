@@ -52,9 +52,9 @@ enum SceneCompositor {
         let outline = layout.screenPath(in: screen)
         ctx.addPath(outline); ctx.clip()
         ctx.saveGState(); ctx.clip(to: page)
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1)); ctx.fill(page)
         ctx.translateBy(x: page.minX, y: page.minY)
-        ctx.translateBy(x: camera.focus.x * (1 - camera.scale), y: camera.focus.y * (1 - camera.scale))
-        ctx.scaleBy(x: camera.scale, y: camera.scale)
+        ctx.concatenate(camera.transform)
         drawImage(webImage, in: CGRect(origin: .zero, size: page.size), context: ctx)
         ctx.restoreGState()
         ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.1))
@@ -64,7 +64,7 @@ enum SceneCompositor {
 
     static func browserBackdrop(model: StudioModel, width: Int, height: Int) throws -> CGImage {
         let c = model.canvas
-        let key = "\(width):\(height):\(c.width):\(c.height):\(c.inset):\(c.contentWidth.map(String.init) ?? "auto"):\(c.backdrop):\(c.browserTheme):\(c.frame.rawValue):\(model.displayTitle):\(model.displayURL):\(model.faviconRevision)"
+        let key = "\(width):\(height):\(c.width):\(c.height):\(c.inset):\(c.contentWidth.map(String.init) ?? "auto"):\(c.backdrop):\(c.glow):\(c.glowRadius):\(c.glowSize):\(c.browserTheme):\(c.frame.rawValue):\(model.displayTitle):\(model.displayURL):\(model.faviconRevision):\(model.canGoBack):\(model.canGoForward):\(model.isLoading)"
         if let cache = backdropCache, cache.key == key { return cache.image }
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
@@ -76,7 +76,7 @@ enum SceneCompositor {
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
         defer { NSGraphicsContext.restoreGraphicsState() }
         let bounds = CGRect(x: 0, y: 0, width: c.width, height: c.height)
-        drawBackdrop(context: context, rect: bounds, style: c.backdrop)
+        drawBackdrop(context: context, rect: bounds, style: c.backdrop, canvas: c)
         DeviceFrameRenderer.draw(canvas: c, context: context)
         if c.frame.showsBrowserChrome {
             let layout = c.layout
@@ -101,11 +101,17 @@ enum SceneCompositor {
         context.restoreGState()
     }
 
-    static func drawBackdrop(context: CGContext, rect: CGRect, style: String) {
+    static func drawBackdrop(context: CGContext, rect: CGRect, style: String, canvas: CanvasSpec? = nil) {
         let colors: [CGColor]
         switch style {
         case "midnight": colors = [color("#142B22").cgColor, color("#21392A").cgColor, color("#17332D").cgColor]
         case "pearl": colors = [color("#F0ECE6").cgColor, color("#F9F6F1").cgColor, color("#E3E8E6").cgColor]
+        case "silver": colors = [color("#C9CDD2").cgColor, color("#E1E3E6").cgColor, color("#BEC3CA").cgColor]
+        case "cloud": colors = [color("#E8EBED").cgColor, color("#F7F8F8").cgColor, color("#E4E8E9").cgColor]
+        case "sky": colors = [color("#D5E5EE").cgColor, color("#ECF3F6").cgColor, color("#CEDFEA").cgColor]
+        case "mint": colors = [color("#D9EDE2").cgColor, color("#EEF6ED").cgColor, color("#CEE7DD").cgColor]
+        case "rose": colors = [color("#F0DCE0").cgColor, color("#F9ECEC").cgColor, color("#EACFD7").cgColor]
+        case "butter": colors = [color("#F1E9C9").cgColor, color("#FAF6E5").cgColor, color("#EBE2BC").cgColor]
         default: colors = [color("#E3EDDB").cgColor, color("#EEF4E5").cgColor, color("#DCEBDD").cgColor]
         }
         let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors as CFArray, locations: [0, 0.55, 1])!
@@ -113,6 +119,17 @@ enum SceneCompositor {
         let glow = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: [NSColor.white.withAlphaComponent(style == "midnight" ? 0.05 : 0.4).cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1])!
         context.drawRadialGradient(glow, startCenter: CGPoint(x: rect.width * 0.75, y: 0), startRadius: 0,
                                    endCenter: CGPoint(x: rect.width * 0.75, y: 0), endRadius: rect.width * 0.65, options: [])
+        if let canvas, canvas.glow {
+            let edge = min(rect.width, rect.height)
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let core = edge * canvas.glowSize / 2
+            let opacity = canvas.browserTheme == "dark" || style == "midnight" ? 0.14 : 0.28
+            let light = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+                colors: [1.0, 0.85, 0.32, 0.0].map { NSColor.white.withAlphaComponent(opacity * $0).cgColor } as CFArray,
+                locations: [0, 0.2, 0.6, 1])!
+            context.drawRadialGradient(light, startCenter: center, startRadius: core,
+                endCenter: center, endRadius: core + edge * canvas.glowRadius, options: [.drawsBeforeStartLocation])
+        }
     }
 
     static func drawEffects(model: StudioModel, context: CGContext, time: Double) {
@@ -124,8 +141,7 @@ enum SceneCompositor {
         let screen = layout.canvasScreen, page = layout.canvasPage
         let camera = effects.camera
         func position(_ p: CGPoint) -> CGPoint {
-            let (x, y) = Motion.cameraPoint(x: p.x, y: p.y, focusX: camera.focus.x, focusY: camera.focus.y, scale: camera.scale)
-            return CGPoint(x: x, y: y)
+            p.applying(camera.transform)
         }
         context.saveGState()
         context.addPath(layout.screenPath(in: screen)); context.clip()
@@ -147,11 +163,12 @@ enum SceneCompositor {
     }
 
     static func drawCaption(_ caption: CaptionState, canvas: CGSize, context: CGContext, time: Double) {
-        let age = time - caption.started
-        guard age >= 0, age < caption.duration, caption.duration > 0 else { return }
-        let fadeTime = min(0.4, caption.duration / 2)
+        let duration = caption.held ? max(0.8, caption.duration) : caption.duration
+        let age = caption.held ? 0.4 : time - caption.started
+        guard age >= 0, age < duration, duration > 0 else { return }
+        let fadeTime = min(0.4, duration / 2)
         let entrance = Motion.ease(min(1, age / fadeTime), curve: "smooth")
-        let exit = Motion.ease(min(1, (caption.duration - age) / fadeTime), curve: "smooth")
+        let exit = Motion.ease(min(1, (duration - age) / fadeTime), curve: "smooth")
         let opacity = min(entrance, exit)
         let minimal = caption.style == "minimal"
         let title = caption.style == "title"
@@ -208,7 +225,7 @@ final class BackdropNSView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func draw(_ dirtyRect: NSRect) {
         if let ctx = NSGraphicsContext.current?.cgContext {
-            SceneCompositor.drawBackdrop(context: ctx, rect: bounds, style: style)
+            SceneCompositor.drawBackdrop(context: ctx, rect: bounds, style: style, canvas: canvas)
             if let canvas { DeviceFrameRenderer.draw(canvas: canvas, context: ctx) }
         }
     }

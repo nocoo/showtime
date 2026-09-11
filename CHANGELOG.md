@@ -2,7 +2,16 @@
 
 ## [Unreleased]
 
-- Simplify capture preset menus and recording controls, derive storyboard names from the loaded script, and remove unused browser navigation observers.
+## [1.4.0] - 2026-09-11
+
+- Separate Agent design previews from locally executed rehearsal and recording scripts. Share one action grammar across CLI, MCP, setup, and timed steps; replace public live recording commands with script playback.
+- Add explicit setup and inclusive playback ranges by original step number or ID, whole-script preflight, stable playback controls, and job feedback with setup position, current action, errors, screenshots, and capture statistics.
+- Add camera zoom-out, translation, rotation, and horizontal/vertical mirroring, sharing preview, export, and inverse input transforms. Hold design captions for screenshot review while preserving timed playback captions.
+- Bundle a Showtime directing skill and discoverable action schemas, include them in one-click Agent instructions and explicit tool updates, and document the new workflow with native CLI/MCP and video tests.
+- Add compact Back, Forward, and Stop loading controls with native history and loading states, matching menu shortcuts, and reliable fragment navigation and load cancellation.
+- Preserve the original backdrops and add presentation gray and five pale candy colors. Add optional central glow with adjustable falloff radius and core size, shared by preview and export and exposed through scripts, CLI, MCP, and the bundled skill.
+- Add a keyboard-accessible Camera offset pad alongside close-up, using the same combined, animated scale and translation as script playback.
+- Simplify capture preset menus and recording controls and derive storyboard names from the loaded script.
 - Use standard JSON encoding and copying, remove unused Orbit icons, styles, and overlay state, and consolidate short-window layout rules.
 
 ## [1.3.4] - 2026-09-10

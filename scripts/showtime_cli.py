@@ -10,6 +10,7 @@ from pathlib import Path
 # Keep the signed app bundle read-only when this entry point runs directly.
 sys.dont_write_bytecode = True
 from showtime_client import Client, ShowtimeError, absolute_path, resolve_script_paths
+from showtime_schema import ACTIONS, BACKDROPS, describe, guide
 from showtime_version import APP_VERSION
 
 
@@ -34,9 +35,14 @@ def content_width(value):
 
 
 def parser():
-    root = argparse.ArgumentParser(prog="showtime", description="Direct real webpages. Make little films.")
+    root = argparse.ArgumentParser(prog="showtime", description="Design with individual actions. Rehearse and record locally executed JSON scripts.",
+                                   epilog="Start with 'showtime guide' and 'showtime schema'. Design and script steps use identical JSON actions.")
     root.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
     commands = root.add_subparsers(dest="command", required=True)
+    commands.add_parser("guide", help="Read the bundled directing skill and workflow")
+    schema_parser = commands.add_parser("schema", help="Read the exact script or action JSON schema")
+    schema_parser.add_argument("topic", nargs="?", choices=["script", *ACTIONS])
+    commands.add_parser("example", help="Print the bundled Orbit JSON script for editing or rehearsal")
     commands.add_parser("status", help="Get browser, camera, recording, and job status")
     commands.add_parser("inspect", help="Get visible elements with selectors and viewport coordinates")
     studio = commands.add_parser("studio", help="Choose the workspace mode or light/dark theme")
@@ -50,26 +56,31 @@ def parser():
     settings.add_argument("--inset", type=float, help="Canvas margin when content width is Auto")
     settings.add_argument("--content-width", dest="contentWidth", type=content_width, default=argparse.SUPPRESS,
                           metavar="PIXELS|auto", help="Screen width in Canvas pixels, excluding the frame; auto fits using inset")
-    settings.add_argument("--backdrop", choices=["mist", "pearl", "midnight"])
+    settings.add_argument("--backdrop", choices=BACKDROPS)
+    settings.add_argument("--glow", action=argparse.BooleanOptionalAction, default=None, help="Enable a subtle central glow behind the frame")
+    settings.add_argument("--glow-radius", dest="glowRadius", type=float, help="Soft falloff relative to the Canvas short edge: 0.1–1.5")
+    settings.add_argument("--glow-size", dest="glowSize", type=float, help="Bright core diameter relative to the Canvas short edge: 0–1")
     settings.add_argument("--frame", choices=["none", "iphone-16-pro", "iphone-16-pro-max", "ipad-pro-11", "ipad-pro-13", "macbook-neo", "macbook-pro"],
                           help="Device proportions and appearance; --content-width sets screen width. Default: none")
     settings.add_argument("--browser-theme", dest="browserTheme", choices=["light", "dark"], help="Frame appearance: light silver; dark indigo on MacBook Neo, space black on other devices; independent of Studio appearance")
-    open_parser = commands.add_parser("open", help="Navigate to a URL (showtime://demo opens Orbit)")
-    open_parser.add_argument("url")
-    open_parser.add_argument("--title")
-    open_parser.add_argument("--display-url", dest="displayURL")
-    action_parser = commands.add_parser("act", help="Execute one JSON action; prefix a filename with @ to read a file")
+    action_parser = commands.add_parser("design", help="Preview one action without recording; use the identical JSON in script steps")
     action_parser.add_argument("action")
+    action_parser.add_argument("--screenshot", help="Save the resulting design preview to a new PNG path")
     action_parser.add_argument("--no-wait", action="store_true")
-    evaluate = commands.add_parser("eval", help="Evaluate a JavaScript expression (including promises)")
-    evaluate.add_argument("expression")
-    for name, help_text in [("run", "Run a JSON film script"), ("demo", "Run the bundled Orbit launch film")]:
+    for name, help_text in [("validate", "Preflight a script and selected range without executing actions"),
+                            ("rehearse", "Execute a script or inclusive step range without starting a recording"),
+                            ("record", "Execute a script or inclusive step range and save an MP4")]:
         cmd = commands.add_parser(name, help=help_text)
-        if name == "run":
-            cmd.add_argument("file", type=Path)
-        cmd.add_argument("--output", help="MP4 output path; enables recording")
-        cmd.add_argument("--rehearse", action="store_true", help="Run without recording")
-        cmd.add_argument("--no-wait", action="store_true", help="Return a job ID immediately")
+        cmd.add_argument("file", type=Path)
+        cmd.add_argument("--from", dest="from_step", type=boundary, help="First step: one-based number or step ID (inclusive)")
+        cmd.add_argument("--to", dest="to_step", type=boundary, help="Last step: one-based number or step ID (inclusive)")
+        cmd.add_argument("--screenshot", help="Capture the final frame to a new PNG path")
+        if name in ("validate", "record"):
+            cmd.add_argument("--output", help="New MP4 path; overrides recording.output in the script")
+        if name == "validate":
+            cmd.add_argument("--mode", choices=["rehearse", "record"], default="rehearse")
+        else:
+            cmd.add_argument("--no-wait", action="store_true", help="Return a job ID immediately; playback continues in the App")
     wait = commands.add_parser("wait", help="Wait for a job and return its results")
     wait.add_argument("job")
     wait.add_argument("--timeout", type=float, default=3600)
@@ -77,23 +88,28 @@ def parser():
     job.add_argument("job")
     screenshot = commands.add_parser("screenshot", help="Save the composed film canvas as a PNG")
     screenshot.add_argument("output", nargs="?")
-    record = commands.add_parser("record", help="Start or finish a manual/API-driven recording")
-    rec = record.add_subparsers(dest="operation", required=True)
-    start = rec.add_parser("start")
-    start.add_argument("--output")
-    start.add_argument("--width", type=int, help="Defaults to the Studio video width")
-    start.add_argument("--height", type=int, help="Defaults to the Studio video height")
-    start.add_argument("--fps", type=int, choices=[24,30,60], help="Defaults to the Studio frame rate")
-    rec.add_parser("stop")
     commands.add_parser("stop", help="Stop a job; an interrupted recording is finalized as a playable partial take")
     commands.add_parser("mcp-config", help="Print a ready-to-paste MCP configuration")
     commands.add_parser("mcp", help="Run the MCP stdio bridge for an agent client")
     return root
 
 
+def boundary(value):
+    try:
+        return int(value)
+    except ValueError:
+        return value
+
+
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
+        if args.command == "guide":
+            print(guide())
+            return 0
+        if args.command == "schema":
+            print(json.dumps(describe(args.topic), ensure_ascii=False, indent=2))
+            return 0
         if args.command == "mcp":
             from showtime_mcp import main as serve_mcp
             serve_mcp()
@@ -104,13 +120,14 @@ def main(argv=None):
         else:
             client = Client()
             if args.command == "status": value = client.status()
+            elif args.command == "example": value = client.request("GET", "/v1/scripts/demo")
             elif args.command == "inspect": value = client.request("GET", "/v1/inspect")
             elif args.command == "studio":
                 body = {key: getattr(args, key) for key in ("mode", "theme", "inspector") if getattr(args, key) is not None}
                 value = client.request("POST", "/v1/studio", body) if body else client.request("GET", "/v1/studio")
             elif args.command == "settings":
                 canvas, video = dict(args.canvas or {}), dict(args.video or {})
-                for key in ("inset", "backdrop", "browserTheme", "frame"):
+                for key in ("inset", "backdrop", "glow", "glowRadius", "glowSize", "browserTheme", "frame"):
                     if getattr(args, key) is not None: canvas[key] = getattr(args, key)
                 if hasattr(args, "contentWidth"): canvas["contentWidth"] = args.contentWidth
                 if args.fps is not None: video["fps"] = args.fps
@@ -118,35 +135,24 @@ def main(argv=None):
                 if canvas: body["canvas"] = canvas
                 if video: body["video"] = video
                 value = client.request("POST", "/v1/settings", body) if body else client.request("GET", "/v1/settings")
-            elif args.command == "open":
-                step = {"action": "open", "url": args.url}
-                for key in ("title", "displayURL"):
-                    if getattr(args, key) is not None: step[key] = getattr(args, key)
-                value = client.act(step)
-            elif args.command == "act":
-                source = Path(args.action[1:]).read_text() if args.action.startswith("@") else args.action
-                value = client.act(json.loads(source), wait=not args.no_wait)
-            elif args.command == "eval":
-                job = client.act({"action": "evaluate", "script": args.expression})
-                value = job["results"][0].get("value")
-            elif args.command in ("run", "demo"):
-                script = json.loads(args.file.read_text()) if args.command == "run" else client.request("GET", "/v1/scripts/demo")
-                script = resolve_script_paths(script, args.file.resolve().parent if args.command == "run" else Path.cwd())
-                if args.output:
-                    script.setdefault("recording", {}).update(output=absolute_path(args.output))
-                if args.rehearse:
-                    script.pop("recording", None)
-                value = client.run(script, wait=not args.no_wait)
+            elif args.command == "design":
+                path = Path(args.action[1:]).expanduser().resolve() if args.action.startswith("@") else None
+                source = path.read_text() if path else args.action
+                step = resolve_script_paths({"steps": [json.loads(source)]}, path.parent if path else Path.cwd())["steps"][0]
+                value = client.design(step, wait=not args.no_wait, screenshot=args.screenshot)
+            elif args.command in ("validate", "rehearse", "record"):
+                path = args.file.expanduser().resolve()
+                script = resolve_script_paths(json.loads(path.read_text()), path.parent)
+                options = {key: value for key, value in (("from", args.from_step), ("to", args.to_step),
+                           ("output", getattr(args, "output", None)), ("screenshot", args.screenshot)) if value is not None}
+                if args.command == "validate":
+                    value = client.validate(script, args.mode, **options)
+                else:
+                    value = client.play(script, args.command, wait=not args.no_wait, **options)
             elif args.command == "wait": value = client.wait(args.job, args.timeout)
             elif args.command == "job": value = client.request("GET", "/v1/jobs/" + args.job)
             elif args.command == "screenshot":
                 value = client.request("POST", "/v1/screenshot", {"output": absolute_path(args.output)} if args.output else {})
-            elif args.command == "record":
-                if args.operation == "stop": value = client.request("POST", "/v1/recording/stop", {})
-                else:
-                    body = {key: getattr(args, key) for key in ("width", "height", "fps") if getattr(args, key) is not None}
-                    if args.output: body["output"] = absolute_path(args.output)
-                    value = client.request("POST", "/v1/recording/start", body)
             elif args.command == "stop": value = client.request("POST", "/v1/cancel", {})
         print(json.dumps(value, ensure_ascii=False, indent=2))
         return 0

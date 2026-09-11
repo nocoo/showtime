@@ -10,6 +10,8 @@ import urllib.request
 from copy import deepcopy
 from pathlib import Path
 
+from showtime_schema import check_action, check_script
+
 
 class ShowtimeError(RuntimeError):
     pass
@@ -67,19 +69,45 @@ class Client:
             job = self.request("GET", "/v1/jobs/" + urllib.parse.quote(job_id, safe=""))
             if job["status"] not in ("running", "queued"):
                 if job["status"] == "failed":
-                    raise ShowtimeError(f"Cue {job['step']}/{job['total']}: {job.get('error', 'Job failed')}")
+                    raise ShowtimeError(f"Job {job_id}: {job.get('error', 'Job failed')}")
                 return job
             if time.monotonic() >= deadline:
                 raise ShowtimeError(f"Timed out waiting for {job_id}; the job may still be running. Use wait or stop.")
             time.sleep(0.15)
 
     def act(self, step: dict, wait: bool = True):
-        result = self.request("POST", "/v1/actions", step)
+        return self.design(step, wait=wait)
+
+    def design(self, step: dict, wait: bool = True, screenshot: str | None = None):
+        check_action(step)
+        body = {"step": resolve_script_paths({"steps": [step]})["steps"][0]}
+        if screenshot:
+            body["screenshot"] = absolute_path(screenshot)
+        result = self.request("POST", "/v1/design", body)
         return self.wait(result["job"]) if wait else result
 
     def run(self, script: dict, wait: bool = True):
-        result = self.request("POST", "/v1/run", script)
+        check_script(script)
+        return self.play(script, "record" if "recording" in script else "rehearse", wait=wait)
+
+    def play(self, script: dict, mode: str, wait: bool = True, **options):
+        if mode not in ("rehearse", "record"):
+            raise ShowtimeError("Playback mode must be rehearse or record.")
+        check_script(script)
+        body = {"script": resolve_script_paths(script), **options}
+        for key in ("output", "screenshot"):
+            if key in body:
+                body[key] = absolute_path(body[key])
+        result = self.request("POST", "/v1/" + mode, body)
         return self.wait(result["job"]) if wait else result
+
+    def validate(self, script: dict, mode: str = "rehearse", **options):
+        check_script(script)
+        body = {"script": resolve_script_paths(script), "mode": mode, **options}
+        for key in ("output", "screenshot"):
+            if key in body:
+                body[key] = absolute_path(body[key])
+        return self.request("POST", "/v1/validate", body)
 
 
 def absolute_path(path: str, base: Path | None = None) -> str:
@@ -89,6 +117,7 @@ def absolute_path(path: str, base: Path | None = None) -> str:
 
 def resolve_script_paths(script: dict, base: Path | None = None) -> dict:
     """Resolve local assets relative to the script; URLs keep their browser semantics."""
+    check_script(script)
     script = deepcopy(script)
     if script.get("recording", {}).get("output"):
         script["recording"]["output"] = absolute_path(script["recording"]["output"], base)
@@ -99,4 +128,5 @@ def resolve_script_paths(script: dict, base: Path | None = None) -> dict:
                     step[key] = absolute_path(step[key], base)
             walk(step.get("steps", []))
     walk(script.get("steps", []))
+    walk(script.get("setup", []))
     return script

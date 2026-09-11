@@ -4,7 +4,7 @@ import ShowtimeCore
 
 enum AgentGuide {
     enum Installation { case missing, updateAvailable, current }
-    private static let toolNames = ["showtime", "showtime_cli.py", "showtime_client.py", "showtime_mcp.py", "showtime_version.py", "package.json"]
+    private static let toolNames = ["showtime", "showtime_cli.py", "showtime_client.py", "showtime_mcp.py", "showtime_schema.py", "showtime_version.py", "SKILL.md", "package.json"]
 
     static var toolsFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Showtime/bin", isDirectory: true)
@@ -66,7 +66,18 @@ enum AgentGuide {
     static let cliSetup = #"export PATH="$HOME/Library/Application Support/Showtime/bin:$PATH""#
     static let connectionCommand = cliSetup + "\nshowtime status"
 
+    static var skill: String {
+        guard let file = Bundle.main.resourceURL?.appendingPathComponent("Tools/SKILL.md"),
+              let text = try? String(contentsOf: file, encoding: .utf8) else {
+            return "Read the directing workflow with showtime guide or the showtime_help MCP tool."
+        }
+        return text
+    }
+
     static func prompt(website: String, brief: String, seconds: Int, exportFolder: URL, canvas: CanvasSpec, video: RecordingSpec, toolsInstalled: Bool, pythonReady: Bool?) -> String {
+        let canvasJSON = String(decoding: try! JSONEncoder().encode(canvas), as: UTF8.self)
+        var exportSpec = video; exportSpec.output = nil
+        let videoJSON = String(decoding: try! JSONEncoder().encode(exportSpec), as: UTF8.self)
         let cliPreparation: String
         if !toolsInstalled {
             cliPreparation = "For CLI access, first have the user select Install tools (or Update tools) in Showtime → AI Director → Agent integration. Python 3.10+ is required; that page provides a download link if needed. Opening Showtime or copying this brief does not install tools."
@@ -76,43 +87,32 @@ enum AgentGuide {
             cliPreparation = "The Showtime CLI is installed in the user's tools folder. It requires Python 3.10+."
         }
         return """
-Direct a polished \(seconds)-second product demo in the running Showtime macOS app and export an MP4.
+Design, rehearse, and record a polished \(seconds)-second product film in the running Showtime macOS app.
 
 Website: \(website.trimmingCharacters(in: .whitespacesAndNewlines))
 Creative brief: \(brief.trimmingCharacters(in: .whitespacesAndNewlines))
 Output folder: \(exportFolder.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path + "/", with: "~/"))
 
-Connection:
-- If Showtime MCP tools are available, start with showtime_status and showtime_studio(mode: "theater").
-- \(cliPreparation) Add the CLI to this terminal session once:
+Current settings:
+{"canvas":\(canvasJSON),"recording":\(videoJSON)}
+Webpage viewport: \(Int(canvas.pageWidth)) × \(Int(canvas.pageHeight)) CSS pixels.
+Preserve these settings unless the creative brief asks for a different format.
+
+Connection and exact syntax:
+- With MCP, call showtime_help(topic: "workflow") and query action topics such as "caption" or "camera". showtime_help(topic: "script") gives the JSON script schema.
+- \(cliPreparation) For CLI access, run this once per terminal session:
   \(cliSetup)
   showtime status
-  showtime studio --mode theater
-  showtime --help
-  Repeat the PATH setup in a new shell; no source checkout or app bundle path is needed.
-- To configure MCP, run showtime mcp-config after the setup above, or copy the configuration from AI Director → Connection details. showtime mcp starts the stdio bridge.
-  Keep Showtime open while directing. CLI and MCP discover the local connection automatically.
+  showtime guide
+  showtime schema
+- CLI help: showtime design --help, showtime rehearse --help, showtime record --help.
+- Keep Showtime open. The tools discover its local connection automatically. showtime mcp-config provides the MCP setup.
 
-Direction:
-1. Open the website using showtime_open or the CLI open command. Use showtime_inspect / CLI inspect to discover visible controls and selectors before clicking.
-2. Plan a short story with a clear opening, 3–5 meaningful moments, and a closing frame. Give every cue a short, human-readable label; use marker actions to name each scene. Showtime shows these labels and progress in Theater.
-3. Write a repeatable JSON film script. Top-level shape:
-   {"version":1,"name":"Product demo","canvas":{"width":\(canvas.width),"height":\(canvas.height),"inset":\(canvas.inset),"contentWidth":\(canvas.contentWidth.map(String.init) ?? "null"),"backdrop":"\(canvas.backdrop)","browserTheme":"\(canvas.browserTheme)","frame":"\(canvas.frame.rawValue)"},"recording":{"output":"ABSOLUTE_NEW_PATH.mp4","width":\(video.width),"height":\(video.height),"fps":\(video.fps)},"steps":[...]}
-   These are the user's current Canvas and video settings. Keep them unless the creative brief requests a different format. showtime_settings / CLI settings can read or adjust them before a take.
-   Current frame: \(canvas.frame.title). Webpage viewport: \(Int(canvas.pageWidth)) × \(Int(canvas.pageHeight)) CSS pixels. contentWidth sets the inner screen width in Canvas pixels, excluding the device shell; null means Auto. Height follows the device screen ratio, or the Canvas ratio for None. A fixed width stays centered, ignores inset, and must fit the full frame inside the Canvas. Export sets capture detail. After changing frame, contentWidth, Canvas size, or inset, inspect again before choosing targets. Phone/tablet frames show device status UI instead of desktop browser chrome.
-   Use a new output filename in the folder above; existing files are never overwritten.
-4. Direct real mouse and keyboard input with move, click, doubleClick, drag, scroll, type, and key actions. Targets use selector or x/y in the unzoomed webpage viewport. Use a real system hand/arrow or a focus ring, deliberate cursor movement, short camera zooms, and restrained animated captions.
-5. Useful effect examples:
-   {"action":"cursor","style":"hand","size":36,"clickEffect":true}
-   {"action":"zoom","selector":"#target","scale":1.5,"duration":0.9,"label":"Focus on the feature"}
-   {"action":"caption","text":"Your headline","style":"glass","position":"bottom","duration":3}
-   {"action":"wait","duration":1.2}
-   Caption duration does not pause the script; add waits deliberately. Parallel groups can combine one move, one zoom, one caption, and waits. Use assert actions to check page responses. Keep the real page title and URL unless the creative brief requests overrides.
-6. Rehearse with showtime_run(rehearse: true) or CLI run SCRIPT.json --rehearse. Inspect a composed screenshot, refine pacing, then run with recording enabled. MCP showtime_run returns a job ID; follow it with showtime_job. The CLI can use run SCRIPT.json --output NEW_PATH.mp4 and wait for completion.
-7. Confirm the completed job and the playable H.264 MP4 at \(video.width) × \(video.height), \(video.fps) fps. Return the movie path and the saved script. The export contains the film canvas; Studio controls and director activity stay in the app. Showtime records silent video.
+Use individual design actions and screenshots to find the intended look. Write a JSON script before rehearsal and recording; include all waits and transitions in the script. Use IDs and inclusive from/to ranges to rehearse a section. Return the verified MP4 and reusable JSON script.
 
-Available action kinds: open, metadata, move, click, doubleClick, drag, scroll, type, key, wait, waitFor, zoom, caption, cursor, marker, assert, evaluate, screenshot, parallel.
-Use the MCP input schemas or CLI help for exact arguments. Work autonomously through rehearsal, verification, and export.
+The bundled skill below is the workflow reference:
+
+\(skill)
 """
     }
 }
@@ -140,10 +140,10 @@ struct DirectorGuideView: View {
                 HStack(alignment: .top, spacing: 24) {
                     guideStep("01", title: "Connect your agent", symbol: "point.3.connected.trianglepath.dotted",
                               detail: "Install the optional tools below, or use an existing MCP connection.")
-                    guideStep("02", title: "Give it a direction", symbol: "text.bubble",
-                              detail: "Share your website and the moments worth showing.")
-                    guideStep("03", title: "Watch the story unfold", symbol: "play.rectangle",
-                              detail: "Follow each cue in Theater, then collect your finished MP4.")
+                    guideStep("02", title: "Shape the scene", symbol: "text.bubble",
+                              detail: "Share your brief. Your agent previews the page, text, and camera.")
+                    guideStep("03", title: "Rehearse, then record", symbol: "play.rectangle",
+                              detail: "Watch the prepared script play in Theater, then collect your MP4.")
                 }
                 agentIntegration
                 briefComposer
@@ -170,7 +170,7 @@ struct DirectorGuideView: View {
                     .font(.system(size: 11, weight: .semibold)).tracking(1.3).foregroundStyle(Theme.accent)
                 Text("Give your agent\nthe director’s chair.")
                     .font(.system(size: 34, weight: .semibold)).tracking(-1).fixedSize(horizontal: false, vertical: true)
-                Text("Describe the story. Your agent directs the real browser, while you watch in Theater.")
+                Text("Describe the story. Your agent designs the scene, then Showtime plays the script while you watch in Theater.")
                     .font(.system(size: 15)).foregroundStyle(Theme.muted).lineSpacing(5).frame(maxWidth: 440, alignment: .leading)
                 HStack(spacing: 12) {
                     Button {

@@ -99,7 +99,10 @@ final class MovieRecorder {
         model.isRecording = true
         model.elapsed = 0
         model.statusText = "Recording a new take"
-        if !model.isPlaying { model.activity.recordingStarted() }
+        if !model.isPlaying {
+            model.playbackMode = .record
+            model.activity.recordingStarted()
+        }
         do { try await consume(webImage: image, at: startTime) }
         catch { await fail(error); throw error }
     }

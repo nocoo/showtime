@@ -9,13 +9,15 @@ Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent
 - `Sources/Showtime/Director`：剧本调度、并行动作、Theater 进度；`Recording` 负责 Canvas 合成与视频编码。
 - `Sources/ShowtimeCore`：可校验的剧本与录制配置；`Tests/ShowtimeCoreTests` 是可在 Command Line Tools 环境运行的检查程序。
 - `scripts/showtime`、`showtime_cli.py`、`showtime_mcp.py`：CLI / MCP 入口，打包时一起放进 App；不依赖源码目录。
-- CLI / MCP 只在 **AI Director → Agent integration → Install / Update tools** 的显式点击后，通过 `AgentGuide.installTools()` 安装随包的 6 个文件到 `~/Library/Application Support/Showtime/bin`。启动、进入页面和复制指令不能安装工具、执行 Python 或弹出依赖安装窗口。页面按文件内容识别未安装/已安装/待更新；Python 检查只在安装/检查按钮后执行，缺少时在页面提供官方 Python 下载链接与重新检查。普通网页/录制流程不依赖 Python。
+- CLI / MCP 只在 **AI Director → Agent integration → Install / Update tools** 的显式点击后，通过 `AgentGuide.installTools()` 安装随包的 8 个文件（含 schema 和 SKILL.md）到 `~/Library/Application Support/Showtime/bin`。启动、进入页面和复制指令不能安装工具、执行 Python 或弹出依赖安装窗口。页面按文件内容识别未安装/已安装/待更新；Python 检查只在安装/检查按钮后执行，缺少时在页面提供官方 Python 下载链接与重新检查。普通网页/录制流程不依赖 Python。
 - 用户在当前 shell 加入上述 PATH 后使用 `showtime`。MCP 配置调用同一入口的 `showtime mcp`，由 shell 展开 HOME；POSIX shell 入口查找现有 Python 3.10+，支持常见 Homebrew/python.org 路径并跳过 Apple 系统安装占位程序。不要把 `Bundle.main.resourceURL`、`#filePath`、临时下载或验收目录写入面向用户的指令；不要自动修改 shell profile 或系统 PATH。工具升级必须由用户点击；已安装工具与 App 文件一致才显示已就绪，工具不能在签名包内生成字节码。
 - `package.json` 只管理版本与快捷命令，没有 Node 依赖，不运行 npm/bun install，也不生成 lockfile。
 - 默认 Canvas 为 1920 × 1080；视频默认 1920 × 1080、30 fps。已保存的用户设置和显式剧本配置优先。视频宽高必须为偶数，与 Canvas 同比例。
 - `canvas.frame` 默认 `none`，未指定 Frame 的旧 JSON 也解码为 `none`。Frame 只定义设备外观与屏幕比例，参考绘图尺寸不能限制网页或导出分辨率。`canvas.contentWidth` 为可选整数，表示不含外壳的屏幕宽度；缺省/null 为 Auto，保留 Canvas/inset 自动适配。固定宽度时忽略 inset，按设备屏幕比例推导高度并居中；None 继承 Canvas 比例。包含外壳的尺寸必须放得下，超限明确报错，不能静默缩放。WebKit 的 CSS 视口使用 `FrameLayout.canvasPage.size`，抓图按 Export 像素密度及镜头缩放采样；外壳与文字在目标分辨率绘制。`FrameLayout` 是预览、合成、鼠标坐标的共同几何来源，屏幕裁剪统一使用 `screenPath(in:)`；`DeviceFrameRenderer` 负责原生矢量外壳。MacBook Neo 为 2026 款 13 英寸、无刘海并保留浏览器顶栏；MacBook Pro 参考 2026 款 16 英寸机身，按用户要求采用完整 16:10 无刘海屏幕，不预留摄像头安全区或绘制浏览器顶栏。两款均为平直底座、上圆下直屏幕，下边框无字标，造型来源见 `docs/studio.md`。所有设备外壳、侧键和底座随 `canvas.browserTheme` 切换：light 为银色，dark 在 Neo 上为靛蓝色，其余为深空黑，独立于 Studio 和网页主题；None 仅切换浏览器顶栏。已移除 SE 和 mini 的绘制与选择入口；解码旧名称时 `iphone-se` → `iphone-16-pro`、`ipad-mini` → `ipad-pro-11`、`macbook` → `macbook-neo`，保留其余设置。iPhone/iPad 的状态栏和底部安全区不覆盖网页；手机框架不等同于 iOS/触摸模拟器。
 - 保留原生红绿灯、标题栏拖动/双击、缩放、最小化、全屏和还原。不要用自绘控件替代窗口行为。
 - 页面输入使用真实 WebKit/AppKit 鼠标、键盘和滚轮事件；JavaScript 用于检查、等待与断言，不代替真实点击。
+- Agent 使用 design 预览单个动作，再用 rehearse / record 执行完整 JSON 或包含两端的步骤范围。两阶段共享动作语法；setup 在每个范围前执行且不进入录制，不隐式补跑跳过的步骤。设计字幕持续显示，播放字幕按 duration 计时。camera 的缩放、平移、旋转和镜像必须在原生预览、导出与输入反向映射中一致。
+- CLI / MCP 的语法定义共用 scripts/showtime_schema.py；用户指引来自 skills/showtime/SKILL.md，并随 App 安装。App 一键复制应包含完整 skill 与 guide/schema/help 的入口。更改动作语法时同步文档、示例和测试。
 - Studio Record 录当前网页，不隐式加载或重播 Orbit 剧本。App 的控制 UI、Toast 和导演状态不进入成片。
 - 每次启动固定打开内置 Orbit（`showtime://demo`），清除旧 `lastWebsite` 偏好，不保存或恢复上次访问的网址。公开代码、文档和剧本不写个人测试站点；示例使用 Orbit 或 `http://localhost:3000`，真实测试地址通过 `--url` 传入。
 - 录制取消仍应生成可播放的部分 MP4。不要隐瞒 `duplicatedFrames`；编码帧率与实际采集速度不同。
@@ -53,14 +55,22 @@ SHOWTIME_ARCH=universal scripts/build.sh release
 | --- | --- | --- |
 | 核心与静态检查 | `scripts/test.sh`：版本一致性、Swift 检查、构建脚本语法、Python 编译、示例 JS 语法 | 每次相关修改、CI |
 | 启动与旧偏好迁移 | `python3 scripts/test_startup.py --app dist/Showtime.app --output-dir artifacts/startup-check`：旧网址偏好清理、Orbit 首屏、原生点击、访问其他网页后重启 | 启动逻辑变化、发布验收 |
+| 设计与脚本流程 | `python3 scripts/test_workflow.py --output-dir artifacts/workflow-check`：共享语法、字幕预览、setup、范围、状态、Orbit 收入与项目章节排练、完整发布演示、镜像输入及部分 MP4 | CLI、MCP、导演与效果变化 |
 | 真实输入与取消 | `python3 scripts/test_integration.py --output-dir artifacts/input-check` | 输入、导演、录制变化 |
 | 原生窗口与布局 | `python3 scripts/test_studio.py --output-dir artifacts/studio-check` | 工具栏、布局、窗口变化 |
 | 视频与 MCP | `python3 scripts/test_capture.py --url 'http://localhost:3000' --output-dir artifacts/capture-check`，省略 `--url` 使用 Orbit | Canvas、导出、Agent 流程变化 |
+| 导航与画面效果 | `python3 scripts/test_presentation.py --output-dir artifacts/presentation-check`：原生前进／后退／停止、片段导航、九种背景、柔光、缩放与偏移的中间视频帧 | 浏览器导航、Backdrop、Camera 变化 |
 | 设备框架 | `python3 scripts/test_frames.py --output-dir artifacts/frame-check`：全部尺寸、窄屏真实输入、缩放、Canvas 适配、原生预览和三类 MP4 | Frame、视口和合成变化 |
 | Agent 工具 | 在 AI Director 点击 Install tools，再运行 `python3 scripts/test_agent_tools.py --app dist/Showtime.app --output-dir artifacts/agent-tools-check`；可用 `--brief` 检查保存的剪贴板指令 | CLI、MCP、按需安装和发布验收 |
 | 压缩包往返 | `python3 scripts/package_release.py --local-preview` | 无证书本地/CI 验证包内容；此包不能作为正式 Release 资产 |
 
-测试输出目录必须新建，不能覆盖已有录像。窗口与录制集成检查共用一个 App，串行运行。它们会操作页面和部分会话状态；结束后恢复目标网站、用户的 Canvas/视频设置、主题与窗口布局。
+测试输出目录必须新建，不能覆盖已有录像。窗口与录制集成检查共用一个 App，串行运行。它们会激活原生窗口，运行期间暂停手动键鼠输入，避免焦点和表单内容被打断；结束后恢复目标网站、用户的 Canvas/视频设置、主题与窗口布局。
+
+视觉验收延续内置 Orbit 的完整产品场景，用真实图表、项目表单和发布演示验证镜头、字幕与输入。保留页面设计与业务反馈，不用孤立色块或测试球替换界面；同时检查代表截图和成片。
+
+完整成片的时序验收不要混入 `/v1/studio/screenshot` 整窗诊断：同步整窗抓图会占用主线程，拖慢采集并影响字幕淡入。整窗截图和故意触发错误的检查单独执行；Agent 的成片截图使用 `/v1/screenshot`。字幕验收需检查视频中的实际画面，不能只检查动作完成状态。
+
+GUI 成片验收需要解锁的 macOS 会话。锁屏后 WebKit 会将页面标记为 `document.hidden` 并暂停 CSS 动画，即使 `ready` 为 true、截图和编码仍能返回。测试需等待页面可见且 Orbit 入场动画完成；主内容空白的录像不能算通过，也不能通过移除页面动画掩盖问题。
 
 若另一个 Agent 正在操作常用 App，使用独立测试副本、独立 bundle ID 与空闲 `SHOWTIME_PORT`，并让 App 和测试客户端使用同一个绝对 `SHOWTIME_CONNECTION` 路径。该文件放在忽略的 `artifacts/` 私有子目录。不要让集成检查覆盖其他 Agent 的连接、会话或录像。
 

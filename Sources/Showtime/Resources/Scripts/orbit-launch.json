@@ -3,30 +3,32 @@
   "name": "Orbit · A little more momentum",
   "canvas": {"width": 1440, "height": 810, "inset": 32, "backdrop": "mist"},
   "recording": {"width": 1920, "height": 1080, "fps": 30},
-  "steps": [
+  "setup": [
     {"action": "open", "url": "showtime://demo", "title": "Orbit — Work in your rhythm", "displayURL": "https://app.orbit.so"},
-    {"action": "cursor", "style": "ring", "size": 30, "color": "#4A8234", "visible": false},
-    {"action": "marker", "text": "The big picture"},
+    {"action": "cursor", "style": "ring", "size": 30, "color": "#4A8234", "visible": false}
+  ],
+  "steps": [
+    {"id": "intro", "action": "marker", "text": "The big picture"},
     {"action": "caption", "eyebrow": "MEET ORBIT", "text": "A little less busywork.", "subtitle": "A lot more momentum.", "style": "title", "position": "center", "duration": 4.2},
     {"action": "wait", "duration": 4.4},
     {"action": "move", "selector": "#revenue-card", "duration": 1.1},
     {"action": "parallel", "steps": [
-      {"action": "zoom", "selector": "#revenue-chart", "scale": 1.5, "duration": 1.2},
+      {"action": "camera", "selector": "#revenue-chart", "scale": 1.5, "duration": 1.2},
       {"action": "caption", "text": "Your whole business, in focus.", "duration": 3.8}
     ]},
     {"action": "click", "selector": "#range-quarter", "duration": 0.9},
     {"action": "wait", "duration": 1.8},
-    {"action": "zoom", "scale": 1, "duration": 1.1},
-    {"action": "marker", "text": "From plan to progress"},
+    {"action": "camera", "scale": 1, "duration": 1.1},
+    {"id": "feature", "action": "marker", "text": "From plan to progress"},
     {"action": "click", "selector": "#projects-nav", "duration": 1},
     {"action": "wait", "duration": 0.5},
     {"action": "caption", "text": "A shared space for every moving part.", "duration": 3},
     {"action": "click", "selector": "#board-aurora", "duration": 1},
     {"action": "waitFor", "selector": "#detail-progress"},
-    {"action": "zoom", "selector": "#detail-progress", "scale": 1.45, "duration": 1},
+    {"action": "camera", "selector": "#detail-progress", "scale": 1.45, "duration": 1},
     {"action": "click", "selector": "#task-payment", "duration": 0.8},
     {"action": "wait", "duration": 1.4},
-    {"action": "zoom", "scale": 1, "duration": 1},
+    {"action": "camera", "scale": 1, "duration": 1},
     {"action": "click", "selector": "#close-detail", "duration": 0.7},
     {"action": "marker", "text": "Make something new"},
     {"action": "click", "selector": "#new-project", "duration": 1},
@@ -44,10 +46,10 @@
     {"action": "wait", "duration": 0.6},
     {"action": "click", "selector": "#search-result-0", "duration": 0.7},
     {"action": "waitFor", "selector": "#detail-title"},
-    {"action": "zoom", "selector": "#detail-title", "scale": 1.4, "duration": 1},
+    {"action": "camera", "selector": "#detail-title", "scale": 1.4, "duration": 1},
     {"action": "caption", "text": "Everything, right where you need it.", "duration": 3.5},
     {"action": "wait", "duration": 2},
-    {"action": "zoom", "scale": 1, "duration": 1},
+    {"action": "camera", "scale": 1, "duration": 1},
     {"action": "click", "selector": "#close-detail", "duration": 0.7},
     {"action": "marker", "text": "Built for what’s next"},
     {"action": "click", "selector": "#overview-nav", "duration": 0.9},
@@ -57,7 +59,7 @@
     {"action": "assert", "script": "window.orbit.state.invites.includes('sam@acme.design')", "label": "Verify the invitation"},
     {"action": "wait", "duration": 1.4},
     {"action": "cursor", "visible": false},
-    {"action": "caption", "eyebrow": "LESS FRICTION. MORE FLOW.", "text": "Good work starts here.", "subtitle": "Meet your team’s next chapter.", "style": "title", "position": "center", "duration": 4.8},
+    {"id": "closing", "action": "caption", "eyebrow": "LESS FRICTION. MORE FLOW.", "text": "Good work starts here.", "subtitle": "Meet your team’s next chapter.", "style": "title", "position": "center", "duration": 4.8},
     {"action": "wait", "duration": 5}
   ]
 }

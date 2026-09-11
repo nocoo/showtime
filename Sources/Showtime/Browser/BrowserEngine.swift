@@ -11,6 +11,7 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
     private var observations: [NSKeyValueObservation] = []
     private(set) var ready = false
     private var navigationError: Error?
+    private var openRequest: UUID?
     private var snapshotTask: (id: UUID, rect: CGRect, pixelWidth: Double, task: Task<CGImage, Error>)?
     private var faviconTask: Task<Void, Never>?
     private var faviconNavigation = UUID()
@@ -40,6 +41,12 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
             webView.observe(\.isLoading, options: [.new]) { [weak self] view, _ in
                 DispatchQueue.main.async { self?.owner?.isLoading = view.isLoading }
             },
+            webView.observe(\.canGoBack, options: [.new]) { [weak self] view, _ in
+                DispatchQueue.main.async { self?.owner?.canGoBack = view.canGoBack }
+            },
+            webView.observe(\.canGoForward, options: [.new]) { [weak self] view, _ in
+                DispatchQueue.main.async { self?.owner?.canGoForward = view.canGoForward }
+            },
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] view, _ in
                 DispatchQueue.main.async { self?.owner?.loadingProgress = view.estimatedProgress }
             },
@@ -58,6 +65,16 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
         owner?.titleOverride = title ?? ""
         owner?.urlOverride = displayURL ?? ""
         owner?.errorMessage = nil
+        // Fragment navigation may complete without a didFinish callback. Only
+        // that same-document case can use URL + isLoading as its completion signal.
+        var previous = webView.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: true) }
+        var destination = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        let fragmentNavigation = previous?.fragment != destination?.fragment || destination?.fragment != nil
+        previous?.fragment = nil; destination?.fragment = nil
+        let sameDocument = ready && fragmentNavigation && previous?.url == destination?.url
+        let request = UUID()
+        openRequest = request
+        defer { if openRequest == request { openRequest = nil } }
         ready = false
         navigationError = nil
         if url.isFileURL { webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent()) }
@@ -65,12 +82,24 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
         let deadline = CACurrentMediaTime() + timeout
         while !ready {
             try Task.checkCancellation()
+            guard openRequest == request else { throw CancellationError() }
             if let navigationError { throw navigationError }
             if CACurrentMediaTime() > deadline { webView.stopLoading(); throw ShowtimeError("Page load timed out: \(address)") }
             try await Task.sleep(for: .milliseconds(40))
+            if sameDocument, !webView.isLoading, webView.url == url { ready = true }
         }
+        guard openRequest == request else { throw CancellationError() }
         _ = try? await evaluate("document.fonts.ready.then(() => true)")
         try await Task.sleep(for: .milliseconds(120))
+        guard openRequest == request else { throw CancellationError() }
+    }
+
+    func cancelOpen() { openRequest = nil }
+
+    func stopLoading() {
+        cancelOpen()
+        webView.stopLoading()
+        ready = webView.url != nil
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

@@ -176,6 +176,7 @@ final class AutomationServer {
                 return .json(status())
             case ("GET", "/v1/inspect"):
                 let inspection = try await model.browser.inspect()
+                if !model.isBusy { model.playbackMode = .design }
                 model.activity.inspected()
                 return .json(inspection)
             case ("GET", "/v1/scripts/demo"):
@@ -185,6 +186,56 @@ final class AutomationServer {
                 let script = try JSONDecoder().decode(FilmScript.self, from: request.body)
                 let id = try model.director.run(script, source: .agent)
                 return .json(["job": id, "status": "running", "poll": "/v1/jobs/\(id)"], status: 202)
+            case ("POST", "/v1/design"):
+                let object = try dictionary(request.body)
+                guard Set(object.keys).isSubset(of: ["step", "screenshot"]), let step = object["step"] as? [String: Any] else {
+                    throw ShowtimeError("Design accepts step and an optional screenshot path. Use the same action object in a script's steps.")
+                }
+                if let screenshot = object["screenshot"], !(screenshot is String) {
+                    throw ShowtimeError("screenshot must be a PNG path string.")
+                }
+                let action = try JSONDecoder().decode(Action.self, from: JSONSerialization.data(withJSONObject: step))
+                let id = try model.director.run(FilmScript(name: action.displayLabel, steps: [action]), singleAction: true,
+                                                source: .agent, mode: .design, screenshot: object["screenshot"] as? String)
+                return .json(["job": id, "status": "running", "mode": "design", "poll": "/v1/jobs/\(id)"], status: 202)
+            case ("POST", "/v1/rehearse"), ("POST", "/v1/record"), ("POST", "/v1/validate"):
+                let object = try dictionary(request.body)
+                let validating = path == "/v1/validate"
+                let allowed: Set<String> = validating ? ["script", "from", "to", "output", "screenshot", "mode"] : ["script", "from", "to", "output", "screenshot"]
+                guard Set(object.keys).isSubset(of: allowed) else {
+                    throw ShowtimeError("Playback accepts script, from, to, output, and screenshot; validate also accepts mode.")
+                }
+                let mode: PlaybackMode
+                if path == "/v1/validate" {
+                    guard object["mode"] == nil || object["mode"] is String,
+                          let value = PlaybackMode(rawValue: object["mode"] as? String ?? "rehearse"), value != .design else {
+                        throw ShowtimeError("Validate mode must be rehearse or record.")
+                    }
+                    mode = value
+                } else { mode = path == "/v1/record" ? .record : .rehearse }
+                let playback = try JSONDecoder().decode(PlaybackRequest.self, from: request.body)
+                var script = playback.script
+                let range = try playback.selectedRange()
+                if mode == .record {
+                    var video = try script.recording ?? model.recordingSettings.fitted(to: script.canvas ?? model.canvas)
+                    guard let output = playback.output ?? video.output, !output.isEmpty else {
+                        throw ShowtimeError("Recording requires a new MP4 output path.")
+                    }
+                    video.output = try OutputFiles.newURL(path: output, defaultFolder: model.exportFolder, ext: "mp4", createDirectory: false).path
+                    script.recording = video
+                } else {
+                    guard playback.output == nil else { throw ShowtimeError("output is only used in record mode.") }
+                    script.recording = nil
+                }
+                try script.validate(defaultCanvas: model.canvas)
+                if let screenshot = playback.screenshot { _ = try OutputFiles.newURL(path: screenshot, defaultFolder: model.exportFolder, ext: "png", createDirectory: false) }
+                if path == "/v1/validate" {
+                    return .json(["valid": true, "mode": mode.rawValue, "name": script.name,
+                                  "range": ["from": range.lowerBound + 1, "to": range.upperBound, "scriptSteps": script.steps.count],
+                                  "steps": range.count, "setupSteps": script.setup.count])
+                }
+                let id = try model.director.run(script, source: .agent, mode: mode, range: range, screenshot: playback.screenshot)
+                return .json(["job": id, "status": "running", "mode": mode.rawValue, "poll": "/v1/jobs/\(id)"], status: 202)
             case ("POST", "/v1/actions"), ("POST", "/v1/open"):
                 var data = request.body
                 if path == "/v1/open" {
@@ -228,7 +279,7 @@ final class AutomationServer {
                 let object = try dictionary(request.body)
                 guard Set(object.keys).isSubset(of: ["canvas", "video"]) else { throw ShowtimeError("Capture settings accept canvas and video objects.") }
                 let canvas = try merged(model.canvas, patch: object["canvas"] ?? [:],
-                                        allowed: ["width", "height", "inset", "backdrop", "browserTheme", "frame", "contentWidth"], nullable: ["contentWidth"])
+                                        allowed: ["width", "height", "inset", "backdrop", "glow", "glowRadius", "glowSize", "browserTheme", "frame", "contentWidth"], nullable: ["contentWidth"])
                 let fitted = try model.recordingSettings.fitted(to: canvas)
                 let video = try merged(fitted, patch: object["video"] ?? [:], allowed: ["width", "height", "fps"])
                 try model.applyCapture(canvas: canvas, video: video)
@@ -299,15 +350,20 @@ final class AutomationServer {
     private func status() -> [String: Any] {
         var object: [String: Any] = [
             "app": "Showtime", "version": 1, "appVersion": AppVersion.number, "ready": model.browser.ready,
-            "playing": model.isPlaying, "recording": model.isRecording, "preparing": model.isPreparing, "finishing": model.isFinishing,
+            "playing": model.isPlaying, "designing": model.isDesigning, "busy": model.isBusy, "workflow": model.playbackMode.rawValue,
+            "recording": model.isRecording, "preparing": model.isPreparing, "finishing": model.isFinishing,
             "title": model.actualTitle, "url": model.actualURL,
+            "navigation": ["canGoBack": model.canGoBack, "canGoForward": model.canGoForward, "loading": model.isLoading,
+                           "canNavigate": model.canNavigate],
             "displayTitle": model.displayTitle, "displayURL": model.displayURL,
             "favicon": ["loaded": model.favicon != nil],
             "viewport": ["width": model.browser.webView.bounds.width, "height": model.browser.webView.bounds.height],
             "canvas": model.captureState["canvas"]!,
             "video": model.captureState["video"]!,
             "storyboard": ["name": model.scriptName, "cues": model.currentScript?.steps.count ?? 0],
-            "camera": ["scale": model.effects.camera.scale, "x": model.effects.camera.focus.x, "y": model.effects.camera.focus.y],
+            "camera": ["scale": model.effects.camera.scale, "x": model.effects.camera.focus.x, "y": model.effects.camera.focus.y,
+                       "offsetX": model.effects.camera.offset.x, "offsetY": model.effects.camera.offset.y, "rotation": model.effects.camera.rotation,
+                       "flipX": model.effects.camera.flipX, "flipY": model.effects.camera.flipY],
             "cursor": ["style": model.effects.pointer.style, "visible": model.effects.pointer.visible, "size": model.effects.pointer.size,
                        "x": model.effects.pointer.point.x, "y": model.effects.pointer.point.y, "color": model.effects.pointer.color,
                        "hotspotX": model.effects.pointer.hotspot.x, "hotspotY": model.effects.pointer.hotspot.y,
@@ -319,6 +375,10 @@ final class AutomationServer {
         if let job = model.director.currentJobID { object["job"] = job }
         if let output = model.lastExportURL { object["lastExport"] = output.path }
         if let error = model.errorMessage { object["error"] = error }
+        if let caption = model.effects.caption {
+            object["caption"] = ["text": caption.text, "style": caption.style, "position": caption.position,
+                                 "duration": caption.duration, "held": caption.held]
+        }
         if let window = model.window { object["windowNumber"] = window.windowNumber }
         return object
     }

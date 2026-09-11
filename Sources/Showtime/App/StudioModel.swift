@@ -4,11 +4,6 @@ import QuartzCore
 import SwiftUI
 import ShowtimeCore
 
-struct CameraState: Sendable {
-    var scale: Double = 1
-    var focus = CGPoint(x: CanvasSpec().pageWidth / 2, y: CanvasSpec().pageHeight / 2)
-}
-
 struct PointerState: Sendable {
     var point = CGPoint(x: 1000, y: 530)
     var style = "ring"
@@ -31,6 +26,7 @@ struct CaptionState: Identifiable, Sendable {
     var position: String
     var started: Double
     var duration: Double
+    var held = false
 }
 
 struct ClickPulse: Identifiable, Sendable {
@@ -66,13 +62,14 @@ final class EffectsState: ObservableObject {
         }
     }
 
-    func showCaption(_ action: Action) {
+    func showCaption(_ action: Action, held: Bool = false) {
         captionTask?.cancel()
         guard let text = action.text, !text.isEmpty else { caption = nil; return }
         let value = CaptionState(text: text, subtitle: action.subtitle ?? "", eyebrow: action.eyebrow ?? "",
                                  style: action.style ?? "glass", position: action.position ?? "bottom",
-                                 started: CACurrentMediaTime(), duration: action.duration ?? 3)
+                                 started: CACurrentMediaTime(), duration: action.duration ?? 3, held: held)
         caption = value
+        if held { return }
         captionTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(value.duration))
             guard !Task.isCancelled, self?.caption?.id == value.id else { return }
@@ -94,6 +91,8 @@ final class StudioModel: ObservableObject {
     @Published var titleOverride = ""
     @Published var urlOverride = ""
     @Published var isLoading = false
+    @Published var canGoBack = false
+    @Published var canGoForward = false
     @Published var loadingProgress = 0.0
     @Published var addressEditing = false
     @Published var showInspector = true
@@ -104,6 +103,7 @@ final class StudioModel: ObservableObject {
     @Published var currentScript: FilmScript?
     @Published var currentStep = -1
     @Published var isPlaying = false
+    @Published var playbackMode: PlaybackMode = .design
     @Published var isRecording = false
     @Published var isPreparing = false
     @Published var isFinishing = false
@@ -135,16 +135,20 @@ final class StudioModel: ObservableObject {
     var displayURL: String { urlOverride.isEmpty ? actualURL : urlOverride }
     var scriptName: String { currentScript?.name ?? "Current webpage" }
     var isBusy: Bool { isPlaying || isRecording || isFinishing || isPreparing }
+    var canNavigate: Bool { !isPlaying && !isFinishing && !isPreparing }
+    var isDesigning: Bool { isPlaying && playbackMode == .design }
+    var isRehearsing: Bool { isPlaying && playbackMode == .rehearse }
     var theaterMode: Bool {
         get { mode == .theater }
         set { mode = newValue ? .theater : .studio }
     }
     var studioState: [String: Any] {
         ["mode": mode.rawValue, "theme": appearance.rawValue, "inspector": selectedInspector,
-         "showInspector": showInspector, "theater": theaterMode]
+         "showInspector": showInspector, "theater": theaterMode, "workflow": playbackMode.rawValue]
     }
     var captureState: [String: Any] {
         ["canvas": ["width": canvas.width, "height": canvas.height, "inset": canvas.inset, "backdrop": canvas.backdrop,
+                    "glow": canvas.glow, "glowRadius": canvas.glowRadius, "glowSize": canvas.glowSize,
                     "browserTheme": canvas.browserTheme, "frame": canvas.frame.rawValue, "contentWidth": canvas.contentWidth as Any? ?? NSNull()],
          "video": ["width": recordingSettings.width, "height": recordingSettings.height, "fps": recordingSettings.fps]]
     }
@@ -198,7 +202,7 @@ final class StudioModel: ObservableObject {
                     }
                 }
                 let tick = CACurrentMediaTime()
-                if self.isRecording || self.effects.camera.scale > 1.001 {
+                if self.isRecording || !self.effects.camera.isIdentity {
                     do {
                         let snapshot = try await (pending ?? capture()).value
                         pending = nil
@@ -228,9 +232,7 @@ final class StudioModel: ObservableObject {
             let screenPoint = self.browser.cssPoint(fromWindow: event.locationInWindow)
             if event.type == .leftMouseUp { self.effects.pointer.pressed = false }
             guard CGRect(origin: .zero, size: self.pageSize).contains(screenPoint) else { return event }
-            let camera = self.effects.camera
-            let point = CGPoint(x: (screenPoint.x - camera.focus.x) / camera.scale + camera.focus.x,
-                                y: (screenPoint.y - camera.focus.y) / camera.scale + camera.focus.y)
+            let point = screenPoint.applying(self.effects.camera.transform.inverted())
             self.effects.pointer.point = point
             self.effects.pointer.visible = true
             if event.type == .leftMouseDown { self.effects.pointer.pressed = true }
@@ -352,7 +354,8 @@ final class StudioModel: ObservableObject {
     }
 
     func toggleRecording() {
-        if isPlaying { director.cancel(); return }
+        if isPlaying && playbackMode == .record { director.cancel(); return }
+        guard !isPlaying else { return }
         guard !isPreparing, !isFinishing else { return }
         Task { @MainActor in
             do {
@@ -363,12 +366,33 @@ final class StudioModel: ObservableObject {
     }
 
     func navigate(_ url: String) {
-        guard !isPlaying, !isFinishing, !isPreparing else { return }
+        guard canNavigate else { return }
         clearStoryboard()
         Task { @MainActor in
             do { try await browser.open(url) }
+            catch is CancellationError { }
             catch { report(error) }
         }
+    }
+
+    func navigateHistory(forward: Bool) {
+        guard canNavigate, forward ? canGoForward : canGoBack else { return }
+        clearStoryboard()
+        titleOverride = ""; urlOverride = ""; errorMessage = nil
+        browser.cancelOpen()
+        if forward { browser.webView.goForward() }
+        else { browser.webView.goBack() }
+    }
+
+    func reloadPage() {
+        guard canNavigate else { return }
+        browser.cancelOpen()
+        browser.webView.reload()
+    }
+
+    func stopLoading() {
+        guard canNavigate, isLoading else { return }
+        browser.stopLoading()
     }
 
     func report(_ error: Error) {
@@ -395,7 +419,7 @@ final class StudioModel: ObservableObject {
 
     func chromeImage(scale: Double) throws -> CGImage {
         let width = canvas.layout.screen.width, scale = max(1, scale)
-        let key = "\(displayTitle)|\(displayURL)|\(width)|\(scale)|\(canvas.browserTheme)|\(faviconRevision)"
+        let key = "\(displayTitle)|\(displayURL)|\(width)|\(scale)|\(canvas.browserTheme)|\(faviconRevision)|\(canGoBack)|\(canGoForward)|\(isLoading)"
         if key == chromeCacheKey, let chromeCache { return chromeCache }
         let renderer = ImageRenderer(content: BrowserChromeView(model: self, exporting: true)
             .frame(width: width, height: CanvasSpec.chromeHeight)
@@ -485,7 +509,7 @@ enum OutputFiles {
         try FileManager.default.moveItem(at: temporary, to: url)
     }
 
-    static func newURL(path: String?, defaultFolder: URL, ext: String) throws -> URL {
+    static func newURL(path: String?, defaultFolder: URL, ext: String, createDirectory: Bool = true) throws -> URL {
         let url: URL
         if let path, !path.isEmpty {
             let expanded = (path as NSString).expandingTildeInPath
@@ -498,7 +522,9 @@ enum OutputFiles {
         }
         guard url.pathExtension.lowercased() == ext else { throw ShowtimeError("Expected a .\(ext) output path.") }
         guard !FileManager.default.fileExists(atPath: url.path) else { throw ShowtimeError("Output already exists: \(url.path). Choose a new filename.") }
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if createDirectory {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
         return url
     }
 }

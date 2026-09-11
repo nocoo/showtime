@@ -127,20 +127,23 @@ struct StudioView: View {
             Button(action: model.revealExport) { Image(systemName: "folder") }
                 .buttonStyle(StudioButtonStyle(treatment: .plain))
                 .help("Show exports").accessibilityLabel("Show exports")
-            Button { model.playStoryboard(record: false) } label: { Label("Rehearse", systemImage: "play") }
-                .buttonStyle(StudioButtonStyle()).disabled(model.isBusy || model.currentScript == nil)
+            Button {
+                if model.isRehearsing { model.director.cancel() }
+                else { model.playStoryboard(record: false) }
+            } label: { Label(model.isRehearsing ? "Stop rehearsal" : "Rehearse", systemImage: model.isRehearsing ? "stop.fill" : "play") }
+                .buttonStyle(StudioButtonStyle()).disabled(!model.isRehearsing && (model.isBusy || model.currentScript == nil))
                 .help("Rehearse the storyboard · ⌘Return")
             Button(action: model.toggleRecording) {
                 HStack(alignment: .center, spacing: 8) {
-                    Image(systemName: model.isPlaying || model.isRecording ? "stop.fill" : "record.circle")
+                    Image(systemName: recordingJob ? "stop.fill" : "record.circle")
                         .frame(width: 16, height: 16).accessibilityHidden(true)
                     Text(recordingTitle)
                 }
                 .font(.system(size: 14, weight: .semibold)).lineLimit(1)
                 .fixedSize(horizontal: true, vertical: true).frame(minWidth: 82, alignment: .center)
             }
-            .buttonStyle(StudioButtonStyle(treatment: model.isPlaying || model.isRecording ? .recording : .accent))
-            .disabled(model.isFinishing || model.isPreparing)
+            .buttonStyle(StudioButtonStyle(treatment: recordingJob ? .recording : .accent))
+            .disabled(model.isFinishing || model.isPreparing || (model.isPlaying && model.playbackMode != .record))
             .accessibilityLabel(recordingTitle)
             .help("Record the current webpage · ⇧⌘Return")
         }.labelStyle(.titleAndIcon).fixedSize(horizontal: true, vertical: false)
@@ -148,9 +151,13 @@ struct StudioView: View {
     }
 
     private var recordingTitle: String {
-        if model.isPreparing { return "Preparing…" }
         if model.isFinishing { return "Finishing…" }
-        return model.isPlaying || model.isRecording ? "Stop Take" : "Record"
+        if model.isPreparing || (recordingJob && !model.isRecording) { return "Preparing…" }
+        return model.isRecording ? "Stop recording" : "Record"
+    }
+
+    private var recordingJob: Bool {
+        model.isRecording || model.isPreparing || model.isFinishing || (model.isPlaying && model.playbackMode == .record)
     }
 
     private var broadcastStatus: some View {
@@ -213,7 +220,7 @@ struct StudioView: View {
                         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.line, lineWidth: 0.75))
                     HStack(spacing: 6) {
                         Image(systemName: "cursorarrow.motionlines").font(.system(size: 12))
-                        Text(model.isPlaying ? "Directing cue \(model.currentStep + 1)" : "Interact with the page to set the scene")
+                        Text(model.isFinishing ? "Saving film" : model.isRecording ? "Recording" : model.playbackMode == .design ? "Design preview" : model.isPlaying ? "Script playback" : "Playback complete")
                             .font(.system(size: 12)).lineLimit(1)
                         Spacer()
                         Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11))
@@ -260,6 +267,7 @@ private struct WebsiteLocationBar: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            BrowserNavigationControls(model: model)
             HStack(spacing: 10) {
                 Image(systemName: "globe").foregroundStyle(Theme.accent)
                 TextField("Open a website · localhost:3000 or https://your-product.com", text: Binding(get: { address }, set: { value in

@@ -41,12 +41,15 @@ struct ShowtimeApp: App {
                 Button("Open Location") {
                     if !model.canvas.frame.showsBrowserChrome { model.mode = .studio }
                     model.addressEditing = true
-                }.keyboardShortcut("l")
-                Button("Reload Page") { if !model.isPlaying { model.browser.webView.reload() } }.keyboardShortcut("r")
-                Button("Back") { if !model.isPlaying { model.browser.webView.goBack() } }.keyboardShortcut("[", modifiers: .command)
-                Button("Forward") { if !model.isPlaying { model.browser.webView.goForward() } }.keyboardShortcut("]", modifiers: .command)
+                }.keyboardShortcut("l").disabled(!model.canNavigate)
+                Button("Reload Page", action: model.reloadPage).keyboardShortcut("r").disabled(!model.canNavigate || model.isLoading)
+                Button("Back") { model.navigateHistory(forward: false) }.keyboardShortcut("[", modifiers: .command)
+                    .disabled(!model.canNavigate || !model.canGoBack)
+                Button("Forward") { model.navigateHistory(forward: true) }.keyboardShortcut("]", modifiers: .command)
+                    .disabled(!model.canNavigate || !model.canGoForward)
+                Button("Stop Loading", action: model.stopLoading).disabled(!model.canNavigate || !model.isLoading)
                 Divider()
-                Button("Open Orbit Demo") { model.navigate("showtime://demo") }
+                Button("Open Orbit Demo") { model.navigate("showtime://demo") }.disabled(!model.canNavigate)
             }
             CommandMenu("Director") {
                 Button("Rehearse Storyboard") { model.playStoryboard(record: false) }

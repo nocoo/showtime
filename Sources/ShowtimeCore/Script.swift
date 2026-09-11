@@ -49,11 +49,17 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
     public var height: Int = 1080
     public var inset: Double = 32
     public var backdrop: String = "mist"
+    public var glow: Bool = false
+    /// Soft falloff beyond the bright core, relative to the Canvas short edge.
+    public var glowRadius: Double = 0.75
+    /// Bright core diameter, relative to the Canvas short edge.
+    public var glowSize: Double = 0.3
     public var browserTheme: String = "light"
     public var frame: DeviceFrame = .none
     /// Screen width in Canvas pixels, excluding hardware. nil keeps automatic fitting.
     public var contentWidth: Int?
     public static let chromeHeight: Double = 56
+    public static let backdrops = ["mist", "pearl", "midnight", "silver", "cloud", "sky", "mint", "rose", "butter"]
 
     public init() {}
 
@@ -63,6 +69,9 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
         height = try c.decodeIfPresent(Int.self, forKey: .height) ?? 1080
         inset = try c.decodeIfPresent(Double.self, forKey: .inset) ?? 32
         backdrop = try c.decodeIfPresent(String.self, forKey: .backdrop) ?? "mist"
+        glow = try c.decodeIfPresent(Bool.self, forKey: .glow) ?? false
+        glowRadius = try c.decodeIfPresent(Double.self, forKey: .glowRadius) ?? 0.75
+        glowSize = try c.decodeIfPresent(Double.self, forKey: .glowSize) ?? 0.3
         browserTheme = try c.decodeIfPresent(String.self, forKey: .browserTheme) ?? "light"
         frame = try c.decodeIfPresent(DeviceFrame.self, forKey: .frame) ?? .none
         contentWidth = try c.decodeIfPresent(Int.self, forKey: .contentWidth)
@@ -92,8 +101,11 @@ public struct CanvasSpec: Codable, Equatable, Sendable {
         if let contentWidth, !(1...maximumContentWidth).contains(contentWidth) {
             throw ShowtimeError("Content width must be between 1 and \(maximumContentWidth) px for \(frame.title) on a \(width) × \(height) Canvas. Use Auto to fit the frame automatically.")
         }
-        guard ["mist", "pearl", "midnight"].contains(backdrop) else {
-            throw ShowtimeError("Unknown backdrop. Use mist, pearl, or midnight.")
+        guard Self.backdrops.contains(backdrop) else {
+            throw ShowtimeError("Unknown backdrop. Use \(Self.backdrops.joined(separator: ", ")).")
+        }
+        guard glowRadius.isFinite, (0.1...1.5).contains(glowRadius), glowSize.isFinite, (0...1).contains(glowSize) else {
+            throw ShowtimeError("Glow radius must be 0.1–1.5 and core size 0–1, relative to the Canvas short edge.")
         }
         guard ["light", "dark"].contains(browserTheme) else {
             throw ShowtimeError("Browser frame theme must be light or dark.")
@@ -161,11 +173,12 @@ public struct RecordingSpec: Codable, Equatable, Sendable {
 
 public enum ActionKind: String, Codable, CaseIterable, Sendable {
     case open, metadata, move, click, doubleClick, drag, scroll, type, key
-    case wait, waitFor, zoom, caption, cursor, marker, assert, screenshot, evaluate, parallel
+    case wait, waitFor, zoom, camera, caption, cursor, marker, assert, screenshot, evaluate, parallel
 }
 
 public struct Action: Codable, Sendable {
     public var action: ActionKind
+    public var id: String?
     public var label: String?
     public var url: String?
     public var title: String?
@@ -192,6 +205,11 @@ public struct Action: Codable, Sendable {
     public var hotspotY: Double?
     public var clickEffect: Bool?
     public var scale: Double?
+    public var offsetX: Double?
+    public var offsetY: Double?
+    public var rotation: Double?
+    public var flipX: Bool?
+    public var flipY: Bool?
     public var deltaX: Double?
     public var deltaY: Double?
     public var key: String?
@@ -214,7 +232,7 @@ public struct Action: Codable, Sendable {
         case .move: return "Guide the cursor"
         case .click, .doubleClick: return "Click \(selector ?? "on page")"
         case .type: return "Type \(text.map { String($0.prefix(26)) } ?? "text")"
-        case .zoom: return (scale ?? 1) > 1 ? "Move in for a closer look" : "Pull the camera back"
+        case .zoom, .camera: return "Move the camera"
         case .caption: return text ?? "Clear caption"
         case .marker: return text ?? "Scene"
         case .wait: return "Let the scene breathe"
@@ -224,12 +242,17 @@ public struct Action: Codable, Sendable {
 
     public func validate(depth: Int = 0) throws {
         guard depth < 5 else { throw ShowtimeError("Parallel groups cannot nest more than four levels.") }
-        let numbers = [x, y, toX, toY, duration, timeout, delay, size, scale, deltaX, deltaY, arc, hotspotX, hotspotY].compactMap { $0 }
+        let numbers = [x, y, toX, toY, duration, timeout, delay, size, scale, offsetX, offsetY, rotation, deltaX, deltaY, arc, hotspotX, hotspotY].compactMap { $0 }
         guard numbers.allSatisfy(\.isFinite) else { throw ShowtimeError("Action values must be finite numbers.") }
+        if let id, id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || id.count > 80 || Double(id.trimmingCharacters(in: .whitespacesAndNewlines)) != nil {
+            throw ShowtimeError("Step IDs must be nonempty, nonnumeric strings of at most 80 characters.")
+        }
         if let duration, !(0...300).contains(duration) { throw ShowtimeError("Duration must be between 0 and 300 seconds.") }
         if let timeout, !(0.1...120).contains(timeout) { throw ShowtimeError("Timeout must be between 0.1 and 120 seconds.") }
         if let delay, !(0...2).contains(delay) { throw ShowtimeError("Typing delay must be between 0 and 2 seconds.") }
-        if let scale, !(1...4).contains(scale) { throw ShowtimeError("Camera scale must be between 1 and 4.") }
+        if let scale, !(0.25...4).contains(scale) { throw ShowtimeError("Camera scale must be between 0.25 and 4.") }
+        if let rotation, !(-360...360).contains(rotation) { throw ShowtimeError("Camera rotation must be between -360 and 360 degrees.") }
+        if [offsetX, offsetY].compactMap({ $0 }).contains(where: { abs($0) > 8192 }) { throw ShowtimeError("Camera offsets must be within 8192 CSS pixels.") }
         if let size, !(8...96).contains(size) { throw ShowtimeError("Cursor size must be between 8 and 96.") }
         if [hotspotX, hotspotY].compactMap({ $0 }).contains(where: { !(0...1).contains($0) }) {
             throw ShowtimeError("Custom cursor hotspots must be fractions between 0 and 1.")
@@ -273,11 +296,12 @@ public struct Action: Codable, Sendable {
             if let style, !["glass", "minimal", "title"].contains(style) { throw ShowtimeError("Caption style: glass, minimal, or title.") }
         case .parallel:
             guard let steps, !steps.isEmpty, steps.count <= 8 else { throw ShowtimeError("parallel needs 1–8 visual steps.") }
-            let allowed: Set<ActionKind> = [.move, .zoom, .caption, .wait]
+            let allowed: Set<ActionKind> = [.move, .zoom, .camera, .caption, .wait]
             var tracks = Set<ActionKind>()
             for step in steps {
-                guard allowed.contains(step.action) else { throw ShowtimeError("parallel supports move, zoom, caption, and wait.") }
-                if step.action != .wait, !tracks.insert(step.action).inserted { throw ShowtimeError("A parallel group can only animate each track once.") }
+                guard allowed.contains(step.action) else { throw ShowtimeError("parallel supports move, camera, zoom, caption, and wait.") }
+                let track: ActionKind = step.action == .zoom ? .camera : step.action
+                if track != .wait, !tracks.insert(track).inserted { throw ShowtimeError("A parallel group can only animate each track once.") }
                 try step.validate(depth: depth + 1)
             }
         default: break
@@ -290,6 +314,8 @@ public struct FilmScript: Codable, Sendable {
     public var name: String = "Untitled film"
     public var canvas: CanvasSpec?
     public var recording: RecordingSpec?
+    /// Explicit preparation runs before every selected range, outside the recording.
+    public var setup: [Action] = []
     public var steps: [Action]
 
     public init(name: String, steps: [Action]) { self.name = name; self.steps = steps }
@@ -299,18 +325,24 @@ public struct FilmScript: Codable, Sendable {
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Untitled film"
         canvas = try c.decodeIfPresent(CanvasSpec.self, forKey: .canvas)
         recording = try c.decodeIfPresent(RecordingSpec.self, forKey: .recording)
+        setup = try c.decodeIfPresent([Action].self, forKey: .setup) ?? []
         steps = try c.decode([Action].self, forKey: .steps)
     }
 
     public func validate(defaultCanvas: CanvasSpec = CanvasSpec()) throws {
         guard version == 1 else { throw ShowtimeError("Unsupported script version \(version). Expected 1.") }
-        guard !steps.isEmpty, steps.count <= 1000 else { throw ShowtimeError("A film needs 1–1000 steps.") }
+        guard !steps.isEmpty, steps.count + setup.count <= 1000 else { throw ShowtimeError("A film needs at least one step and at most 1000 steps including setup.") }
         let c = canvas ?? defaultCanvas
         try c.validate()
         try recording?.validate(canvas: c)
-        for (index, step) in steps.enumerated() {
-            do { try step.validate() }
-            catch { throw ShowtimeError("Step \(index + 1) (\(step.action.rawValue)): \(error.localizedDescription)") }
+        var ids = Set<String>()
+        for (section, actions) in [("Setup", setup), ("Step", steps)] {
+            for (index, step) in actions.enumerated() {
+                do {
+                    try step.validate()
+                    if let id = step.id, !ids.insert(id).inserted { throw ShowtimeError("Duplicate step ID: \(id).") }
+                } catch { throw ShowtimeError("\(section) \(index + 1) (\(step.action.rawValue)): \(error.localizedDescription)") }
+            }
         }
     }
 }

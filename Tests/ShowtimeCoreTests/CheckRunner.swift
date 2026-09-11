@@ -45,6 +45,9 @@ enum CheckRunner {
         let script = ScriptTests(), http = HTTPTests()
         let checks: [(String, () throws -> Void)] = [
             ("Minimal script defaults", script.testMinimalScriptUsesDefaults),
+            ("Inclusive playback ranges and original step IDs", script.testPlaybackRangesKeepOriginalStepNumbers),
+            ("Setup, step IDs, and camera tracks preflight", script.testSetupAndIDsArePreflighted),
+            ("Camera scale, pan, rotation, mirror, and inverse input", script.testCameraTransformsRoundTripInput),
             ("Unknown actions", script.testUnknownActionIsRejectedBeforeExecution),
             ("Whole-script preflight", script.testInvalidLaterCuePreventsWholeFilm),
             ("Coordinate pairs", script.testTargetNeedsBothCoordinates),
@@ -54,6 +57,7 @@ enum CheckRunner {
             ("Custom canvas output compatibility", script.testCustomCanvasAlwaysProducesCompatibleVideo),
             ("Capture settings validation", script.testVideoFittingDoesNotHideInvalidSettings),
             ("Custom output survives appearance and frame-rate edits", script.testCustomVideoSurvivesAppearanceAndFrameRateEdits),
+            ("Backdrop and glow defaults, persistence, and bounds", script.testBackdropAndGlowSettingsPreserveOldCanvases),
             ("Device proportions, Canvas-sized viewports, 4K fitting, and backward compatibility", script.testDeviceFramesScaleContentWithCanvas),
             ("Fixed content width, centering, limits, and Auto compatibility", script.testFixedContentWidthCentersAndValidatesFrames),
             ("Parallel track conflicts", script.testParallelTracksCannotRaceForTheSameProperty),
