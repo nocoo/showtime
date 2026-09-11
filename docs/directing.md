@@ -45,16 +45,19 @@ showtime design '{"action":"caption","text":""}'
 | `camera` | 放大／缩小、平移、旋转、水平／垂直镜像 |
 | `zoom` | 旧剧本的缩放简写；新剧本可统一使用 camera |
 | `caption`、`cursor` | 字幕（含副标题、眉题）和鼠标外观 |
+| `overlay` | 加载透明 HTML／React 动画层，更新 props 或清除，保留网页点击与输入 |
 | `wait`、`waitFor` | 按秒停留，或等待可见元素／JavaScript 条件 |
 | `assert`、`evaluate` | 检查实际网页结果、返回 JavaScript 的 JSON 值 |
 | `screenshot`、`marker` | 保存合成 PNG、为场景命名 |
-| `parallel` | 同时执行独立的镜头、鼠标、文字和等待 |
+| `parallel` | 同时执行独立的镜头、鼠标、文字、动画层和等待 |
 
 `camera.scale` 为 0.25–4；`offsetX/offsetY` 是 CSS 像素（各限 ±8192），`rotation` 为顺时针角度（−360–360），`flipX/flipY` 为布尔值。`selector` 或 `x/y` 设置支点。未指定的字段保持原值，数值在 duration 内过渡，镜像立即切换。恢复原样时显式设置 scale 为 1、偏移与旋转为 0、镜像为 false。
 
 Canvas 中的 Camera 触控板写入同一组偏移，右／下为正。把 `scale`、`offsetX`、`offsetY` 放在同一个动作中即可同步动画，例如 `{"action":"camera","scale":1.5,"offsetX":90,"offsetY":-40,"duration":1.2}`。Backdrop 的 Silver 灰色、五种淡糖果色及可调中心柔光也可写入剧本 `canvas`，完整参数见 [背景与 Camera](studio.md#背景柔光与-camera)。
 
 镜头只变换网页内容，设备外壳与字幕固定。动作目标始终是变换前的网页 CSS 坐标，左上角为原点；人的鼠标点击会反向映射。Frame 改变比例和外观，不模拟 iOS。原生输入会真实操作网站。
+
+需要点赞、粒子或自定义标注时，用 `overlay` 加载实现 `window.showtimeOverlay(context)` 的 HTML 页面。React 组件从 `frame` 和 `fps` 计算动画，图层固定在整个 Canvas 上并穿透鼠标、保留网页键盘焦点。把 source 放在 setup，steps 中用 props 触发，duration 只控制显示时间；预览、截图与视频包含同一层。完整协议和可运行示例见[透明动画图层](overlays.md)。
 
 ## 剧本：准备与播放
 
@@ -102,9 +105,9 @@ CLI 默认等待完成，`--no-wait` 返回任务 ID。MCP `showtime_rehearse` /
 
 `from/to` 为从 1 开始的顶层步骤序号或 ID，两端包含；仅提供 from 时跑到结尾。它们不是视频时间码，也不能定位 setup 或 parallel 子步骤。播放前重置视觉效果，执行 setup，再运行选中步骤。跳过的步骤不会补跑，网页不自动回滚。重复排练中段所需的状态应写在 setup，准备动作也会真实影响网页。
 
-setup 和顶层 steps 总计最多 1000 个。每组 parallel 最多 8 个子动作：一个 camera/zoom、一个 move、一个 caption 和多个 wait；其他输入顺序执行。完整字段和限制以 schema 为准。
+setup 和顶层 steps 总计最多 1000 个。每组 parallel 最多 8 个子动作：一个 camera/zoom、一个 move、一个 caption、一个 overlay 和多个 wait；其他输入顺序执行。完整字段和限制以 schema 为准。
 
-JSON 文件内的图片、截图和录像路径相对文件解析；CLI 的 `--output/--screenshot` 相对当前终端目录。MCP 内联对象相对 bridge 工作目录，建议使用绝对路径。HTTP 输出路径必须绝对或以 `~/` 开头。PNG 和 MP4 都使用新文件名，不覆盖已有文件。
+JSON 文件内的图片、overlay source、截图和录像路径相对文件解析，HTTP(S) source 保留为 URL；CLI 的 `--output/--screenshot` 相对当前终端目录。MCP 内联对象相对 bridge 工作目录，建议使用绝对路径。HTTP 输出路径必须绝对或以 `~/` 开头。PNG 和 MP4 都使用新文件名，不覆盖已有文件。
 
 validate 校验整个剧本的动作参数和选段，即使非法步骤不在选段内也拒绝执行。它不操作网页或创建输出目录。元素是否存在、条件能否成立，需要通过排练验证。
 

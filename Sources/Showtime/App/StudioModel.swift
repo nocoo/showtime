@@ -120,6 +120,7 @@ final class StudioModel: ObservableObject {
     let toasts = ToastCenter()
     let activity = DirectorActivity()
     let browser = BrowserEngine()
+    lazy var overlay = OverlayEngine(model: self)
     lazy var recorder = MovieRecorder(model: self)
     lazy var director = Director(model: self)
     lazy var server = AutomationServer(model: self)
@@ -198,7 +199,10 @@ final class StudioModel: ObservableObject {
                     Task { @MainActor in
                         let canvas = self.canvas
                         let image = try await self.browser.snapshot()
-                        return (image, canvas, SceneCompositor.Effects(self.effects), CACurrentMediaTime())
+                        let time = CACurrentMediaTime()
+                        var effects = SceneCompositor.Effects(self.effects)
+                        effects.overlayImage = try await self.overlay.snapshot(at: time)
+                        return (image, canvas, effects, time)
                     }
                 }
                 let tick = CACurrentMediaTime()
@@ -218,9 +222,17 @@ final class StudioModel: ObservableObject {
                     } catch {
                         pending?.cancel(); pending = nil
                         if self.isRecording { await self.recorder.fail(error) }
+                        else if self.isPlaying { self.director.abort(error) }
                     }
                 } else {
                     pending?.cancel(); pending = nil
+                    if self.overlay.isActive {
+                        do { _ = try await self.overlay.snapshot(at: CACurrentMediaTime()) }
+                        catch {
+                            if self.isPlaying { self.director.abort(error) }
+                            else { self.report(error) }
+                        }
+                    }
                 }
                 if self.isRecording, self.recorder.elapsed - self.elapsed >= 0.15 { self.elapsed = self.recorder.elapsed }
                 let frameInterval = 1.0 / Double(self.isRecording ? self.recorder.spec.fps : 30)
@@ -433,7 +445,9 @@ final class StudioModel: ObservableObject {
 
     func screenshot(to path: String) async throws -> URL {
         let image = try await browser.snapshot()
-        let frame = try SceneCompositor.render(model: self, webImage: image, width: recordingSettings.width, height: recordingSettings.height)
+        let overlayImage = try await overlay.snapshot(at: CACurrentMediaTime())
+        let frame = try SceneCompositor.render(model: self, webImage: image, width: recordingSettings.width, height: recordingSettings.height,
+                                              overlayImage: overlayImage)
         let url = try OutputFiles.newURL(path: path, defaultFolder: exportFolder, ext: "png")
         let data = NSBitmapImageRep(cgImage: frame).representation(using: .png, properties: [:])
         guard let data else { throw ShowtimeError("PNG encoding failed.") }
@@ -463,7 +477,9 @@ final class StudioModel: ObservableObject {
         context.translateBy(x: 0, y: Double(nativeImage.height))
         context.scaleBy(x: Double(nativeImage.width) / content.bounds.width, y: -Double(nativeImage.height) / content.bounds.height)
         SceneCompositor.drawImage(nativeImage, in: content.bounds, context: context)
-        let frame = try SceneCompositor.render(model: self, webImage: webImage, width: 1920, height: Int(1920 * Double(canvas.height) / Double(canvas.width)))
+        let overlayImage = try await overlay.snapshot(at: CACurrentMediaTime(), pixelWidth: 1920)
+        let frame = try SceneCompositor.render(model: self, webImage: webImage, width: 1920, height: Int(1920 * Double(canvas.height) / Double(canvas.width)),
+                                              overlayImage: overlayImage)
         context.saveGState()
         let stageFrame = stageView.convert(stageView.bounds, to: content)
         let captureFrame = content.isFlipped ? stageFrame : CGRect(x: stageFrame.minX, y: content.bounds.height - stageFrame.maxY,
@@ -489,6 +505,7 @@ final class StudioModel: ObservableObject {
 
     func stopServices() {
         previewTask?.cancel()
+        overlay.reset()
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor); self.eventMonitor = nil }
         server.stop()
     }

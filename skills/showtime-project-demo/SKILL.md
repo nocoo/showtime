@@ -116,7 +116,7 @@ before locking website timing; shorten copy or adjust scene allocation when it o
    are original untransformed CSS coordinates. Set scale and offsets together; omitted camera
    fields persist. Device frames and captions stay outside the webpage camera transform.
 5. Caption duration does not pause playback. Add explicit waits. `parallel` may combine one
-   camera track, one move, one caption, and waits. Keep all actions, waits and transitions in
+   camera track, one move, one caption, one overlay, and waits. Keep all actions, waits and transitions in
    the JSON so agent round trips cannot create timing gaps. Use `waitFor` and `assert` for
    actual page responses instead of relying only on fixed delays.
 

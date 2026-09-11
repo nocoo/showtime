@@ -148,6 +148,7 @@ private extension Action {
         case .wait, .waitFor: return "pause"
         case .zoom, .camera: return "viewfinder"
         case .caption: return "text.bubble"
+        case .overlay: return "square.3.layers.3d"
         case .cursor: return "cursorarrow"
         case .marker: return "film.stack"
         case .assert: return "checkmark.shield"
@@ -172,6 +173,7 @@ private extension Action {
         case .waitFor: return "Wait for the page"
         case .zoom, .camera: return "Position the camera"
         case .caption: return text?.isEmpty == false ? "Bring in the headline" : "Clear the headline"
+        case .overlay: return clear == true ? "Clear the animation layer" : "Bring in the animation"
         case .cursor: return "Style the cursor"
         case .marker: return text ?? "Start a new scene"
         case .assert: return "Check the result"
@@ -186,6 +188,7 @@ private extension Action {
         case .open: return title ?? URL(string: url ?? "")?.host ?? "Loading the website for this take."
         case .metadata: return title ?? "Updating the title and address shown in the film."
         case .caption: return text ?? "Making room for the next scene."
+        case .overlay: return "Layering animation over the film while keeping the page interactive."
         case .zoom, .camera: return "Adjust scale, position, rotation, or mirroring."
         case .wait: return String(format: "A %.1f second pause lets the moment land.", duration ?? 1)
         case .waitFor: return "Continuing as soon as the next element is ready."

@@ -79,6 +79,7 @@ final class Director {
         if mode != .design {
             try model.stageScript(script)
             model.effects.reset(pageSize: model.pageSize)
+            model.overlay.reset()
         } else if script.steps.first?.action == .open {
             model.clearStoryboard()
         }
@@ -138,6 +139,7 @@ final class Director {
                 ownsRecording = true
             }
             jobs[jobID]?.phase = "running"
+            if mode == .rehearse { model.overlay.startTimeline(at: CACurrentMediaTime()) }
             for index in startIndex..<range.upperBound {
                 try Task.checkCancellation()
                 try await runStep(script.steps[index], index: index, script: script, range: range, jobID: jobID)
@@ -311,6 +313,9 @@ final class Director {
             }
         case .caption:
             effects.showCaption(step, held: model.isDesigning)
+        case .overlay:
+            try await model.overlay.apply(step, preparing: currentJobID.flatMap { jobs[$0]?.phase } == "setup")
+            return model.overlay.state
         case .cursor:
             if let style = step.style { effects.pointer.style = style }
             if let size = step.size { effects.pointer.size = size }

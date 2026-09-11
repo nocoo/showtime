@@ -335,6 +335,9 @@ struct FilmStageView: View {
             .clipShape(outline)
             .overlay(outline.stroke(.black.opacity(0.10), lineWidth: 0.7 * layout.scale).allowsHitTesting(false))
             .offset(x: screen.minX, y: screen.minY)
+            AnimationOverlay(model: model)
+                .frame(width: Double(model.canvas.width), height: Double(model.canvas.height))
+                .allowsHitTesting(false).accessibilityHidden(true)
             EffectsLayer(model: model, effects: effects)
         }
     }

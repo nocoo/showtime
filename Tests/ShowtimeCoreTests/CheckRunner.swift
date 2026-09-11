@@ -63,6 +63,7 @@ enum CheckRunner {
             ("Parallel track conflicts", script.testParallelTracksCannotRaceForTheSameProperty),
             ("Serialized native input", script.testNativeSideEffectsCannotRunInParallel),
             ("Independent visual tracks", script.testIndependentVisualTracksCanRunTogether),
+            ("Overlay sources, JSON props, clearing, and track conflicts", script.testOverlayActionsValidateSourcesPropsAndTrackConflicts),
             ("Custom cursor asset", script.testCustomCursorMustHaveAnAsset),
             ("Cursor hotspot bounds", script.testCursorHotspotMustStayInsideImage),
             ("Cursor style validation", script.testCursorStylesRemainExplicit),

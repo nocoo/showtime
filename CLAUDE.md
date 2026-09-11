@@ -16,6 +16,7 @@ Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent
 - `canvas.frame` 默认 `none`，未指定 Frame 的旧 JSON 也解码为 `none`。Frame 只定义设备外观与屏幕比例，参考绘图尺寸不能限制网页或导出分辨率。`canvas.contentWidth` 为可选整数，表示不含外壳的屏幕宽度；缺省/null 为 Auto，保留 Canvas/inset 自动适配。固定宽度时忽略 inset，按设备屏幕比例推导高度并居中；None 继承 Canvas 比例。包含外壳的尺寸必须放得下，超限明确报错，不能静默缩放。WebKit 的 CSS 视口使用 `FrameLayout.canvasPage.size`，抓图按 Export 像素密度及镜头缩放采样；外壳与文字在目标分辨率绘制。`FrameLayout` 是预览、合成、鼠标坐标的共同几何来源，屏幕裁剪统一使用 `screenPath(in:)`；`DeviceFrameRenderer` 负责原生矢量外壳。MacBook Neo 为 2026 款 13 英寸、无刘海并保留浏览器顶栏；MacBook Pro 参考 2026 款 16 英寸机身，按用户要求采用完整 16:10 无刘海屏幕，不预留摄像头安全区或绘制浏览器顶栏。两款均为平直底座、上圆下直屏幕，下边框无字标，造型来源见 `docs/studio.md`。所有设备外壳、侧键和底座随 `canvas.browserTheme` 切换：light 为银色，dark 在 Neo 上为靛蓝色，其余为深空黑，独立于 Studio 和网页主题；None 仅切换浏览器顶栏。已移除 SE 和 mini 的绘制与选择入口；解码旧名称时 `iphone-se` → `iphone-16-pro`、`ipad-mini` → `ipad-pro-11`、`macbook` → `macbook-neo`，保留其余设置。iPhone/iPad 的状态栏和底部安全区不覆盖网页；手机框架不等同于 iOS/触摸模拟器。
 - 保留原生红绿灯、标题栏拖动/双击、缩放、最小化、全屏和还原。不要用自绘控件替代窗口行为。
 - 页面输入使用真实 WebKit/AppKit 鼠标、键盘和滚轮事件；JavaScript 用于检查、等待与断言，不代替真实点击。
+- `overlay` 使用独立、透明、非持久化的 WKWebView 覆盖整个 Canvas，位于网页/外壳之上、原生鼠标/字幕之下。原生 hitTest 穿透且文档 inert，不能抢夺网页鼠标或键盘焦点。预览、PNG、MP4 使用同一帧回调与 alpha 抓图，按 Export 像素密度合成。setup 固定第 0 帧，播放开始或 props 更新重置时钟；每个新选段重置 renderer。一个 parallel 可有一个 overlay；任意数量组件在同一页面中绘制。React 示例依赖仅在 `examples/overlay-react` 中安装，根目录无 Node 依赖。协议见 `docs/overlays.md`，安装后的 skill 必须包含自足的回调说明。
 - Agent 使用 design 预览单个动作，再用 rehearse / record 执行完整 JSON 或包含两端的步骤范围。两阶段共享动作语法；setup 在每个范围前执行且不进入录制，不隐式补跑跳过的步骤。设计字幕持续显示，播放字幕按 duration 计时。camera 的缩放、平移、旋转和镜像必须在原生预览、导出与输入反向映射中一致。
 - CLI / MCP 的语法定义共用 scripts/showtime_schema.py；用户指引来自 skills/showtime/SKILL.md，并随 App 安装。App 一键复制应包含完整 skill 与 guide/schema/help 的入口。更改动作语法时同步文档、示例和测试。
 - Studio Record 录当前网页，不隐式加载或重播 Orbit 剧本。App 的控制 UI、Toast 和导演状态不进入成片。
@@ -56,6 +57,7 @@ SHOWTIME_ARCH=universal scripts/build.sh release
 | 核心与静态检查 | `scripts/test.sh`：版本一致性、Swift 检查、构建脚本语法、Python 编译、示例 JS 语法 | 每次相关修改、CI |
 | 启动与旧偏好迁移 | `python3 scripts/test_startup.py --app dist/Showtime.app --output-dir artifacts/startup-check`：旧网址偏好清理、Orbit 首屏、原生点击、访问其他网页后重启 | 启动逻辑变化、发布验收 |
 | 设计与脚本流程 | `python3 scripts/test_workflow.py --output-dir artifacts/workflow-check`：共享语法、字幕预览、setup、范围、状态、Orbit 收入与项目章节排练、完整发布演示、镜像输入及部分 MP4 | CLI、MCP、导演与效果变化 |
+| 透明动画层 | 先在 `examples/overlay-react` 构建示例，再运行 `python3 scripts/test_overlay.py --output-dir artifacts/overlay-check`：原生点击穿透、焦点、React、帧时钟、错误与取消、1080p/4K/部分 MP4 | overlay、WebView 输入隔离与合成变化 |
 | 真实输入与取消 | `python3 scripts/test_integration.py --output-dir artifacts/input-check` | 输入、导演、录制变化 |
 | 原生窗口与布局 | `python3 scripts/test_studio.py --output-dir artifacts/studio-check` | 工具栏、布局、窗口变化 |
 | 视频与 MCP | `python3 scripts/test_capture.py --url 'http://localhost:3000' --output-dir artifacts/capture-check`，省略 `--url` 使用 Orbit | Canvas、导出、Agent 流程变化 |

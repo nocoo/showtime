@@ -173,7 +173,7 @@ public struct RecordingSpec: Codable, Equatable, Sendable {
 
 public enum ActionKind: String, Codable, CaseIterable, Sendable {
     case open, metadata, move, click, doubleClick, drag, scroll, type, key
-    case wait, waitFor, zoom, camera, caption, cursor, marker, assert, screenshot, evaluate, parallel
+    case wait, waitFor, zoom, camera, caption, overlay, cursor, marker, assert, screenshot, evaluate, parallel
 }
 
 public struct Action: Codable, Sendable {
@@ -215,6 +215,8 @@ public struct Action: Codable, Sendable {
     public var key: String?
     public var modifiers: [String]?
     public var clear: Bool?
+    public var source: String?
+    public var props: [String: JSONValue]?
     public var script: String?
     public var equals: JSONValue?
     public var output: String?
@@ -234,9 +236,25 @@ public struct Action: Codable, Sendable {
         case .type: return "Type \(text.map { String($0.prefix(26)) } ?? "text")"
         case .zoom, .camera: return "Move the camera"
         case .caption: return text ?? "Clear caption"
+        case .overlay: return clear == true ? "Clear the animation layer" : "Update the animation layer"
         case .marker: return text ?? "Scene"
         case .wait: return "Let the scene breathe"
         default: return action.rawValue.prefix(1).uppercased() + action.rawValue.dropFirst()
+        }
+    }
+
+    public var overlaySourceURL: URL? {
+        get throws {
+            guard let source else { return nil }
+            if source.hasPrefix("/") || source.hasPrefix("~/") {
+                return URL(fileURLWithPath: (source as NSString).expandingTildeInPath).standardizedFileURL
+            }
+            guard let url = URL(string: source),
+                  (["http", "https"].contains(url.scheme?.lowercased() ?? "") && url.host?.isEmpty == false)
+                    || (url.isFileURL && url.path.hasPrefix("/") && (url.host == nil || url.host == "" || url.host == "localhost")) else {
+                throw ShowtimeError("Overlay source must be an absolute HTML path or an http://, https://, or local file:// URL. CLI script paths are resolved relative to the script.")
+            }
+            return url
         }
     }
 
@@ -294,12 +312,21 @@ public struct Action: Codable, Sendable {
             if let text, text.count > 400 { throw ShowtimeError("Captions are limited to 400 characters.") }
             if let position, !["bottom", "center", "top"].contains(position) { throw ShowtimeError("Caption position: bottom, center, or top.") }
             if let style, !["glass", "minimal", "title"].contains(style) { throw ShowtimeError("Caption style: glass, minimal, or title.") }
+        case .overlay:
+            if clear == true {
+                guard source == nil, props == nil, duration == nil else {
+                    throw ShowtimeError("overlay clear cannot also load a source, set props, or set a duration.")
+                }
+            } else {
+                guard source != nil || props != nil else { throw ShowtimeError("overlay requires source, props, or clear: true.") }
+                _ = try overlaySourceURL
+            }
         case .parallel:
             guard let steps, !steps.isEmpty, steps.count <= 8 else { throw ShowtimeError("parallel needs 1–8 visual steps.") }
-            let allowed: Set<ActionKind> = [.move, .zoom, .camera, .caption, .wait]
+            let allowed: Set<ActionKind> = [.move, .zoom, .camera, .caption, .overlay, .wait]
             var tracks = Set<ActionKind>()
             for step in steps {
-                guard allowed.contains(step.action) else { throw ShowtimeError("parallel supports move, camera, zoom, caption, and wait.") }
+                guard allowed.contains(step.action) else { throw ShowtimeError("parallel supports move, camera, zoom, caption, overlay, and wait.") }
                 let track: ActionKind = step.action == .zoom ? .camera : step.action
                 if track != .wait, !tracks.insert(track).inserted { throw ShowtimeError("A parallel group can only animate each track once.") }
                 try step.validate(depth: depth + 1)

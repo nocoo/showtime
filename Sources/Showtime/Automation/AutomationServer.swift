@@ -359,6 +359,7 @@ final class AutomationServer {
             "favicon": ["loaded": model.favicon != nil],
             "viewport": ["width": model.browser.webView.bounds.width, "height": model.browser.webView.bounds.height],
             "canvas": model.captureState["canvas"]!,
+            "overlay": model.overlay.state,
             "video": model.captureState["video"]!,
             "storyboard": ["name": model.scriptName, "cues": model.currentScript?.steps.count ?? 0],
             "camera": ["scale": model.effects.camera.scale, "x": model.effects.camera.focus.x, "y": model.effects.camera.focus.y,

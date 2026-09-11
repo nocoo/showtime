@@ -10,6 +10,7 @@ enum SceneCompositor {
         let pointer: PointerState
         let caption: CaptionState?
         let pulses: [ClickPulse]
+        var overlayImage: CGImage?
 
         @MainActor init(_ state: EffectsState) {
             camera = state.camera; pointer = state.pointer
@@ -24,7 +25,7 @@ enum SceneCompositor {
                        blue: Double(value & 255) / 255, alpha: alpha)
     }
 
-    static func render(model: StudioModel, webImage: CGImage, width: Int, height: Int) throws -> CGImage {
+    static func render(model: StudioModel, webImage: CGImage, width: Int, height: Int, overlayImage: CGImage? = nil) throws -> CGImage {
         try autoreleasepool {
             guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -35,7 +36,7 @@ enum SceneCompositor {
             NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
             defer { NSGraphicsContext.restoreGraphicsState() }
             drawContent(canvas: model.canvas, camera: model.effects.camera, webImage: webImage,
-                        backdrop: try browserBackdrop(model: model, width: width, height: height), context: ctx)
+                        backdrop: try browserBackdrop(model: model, width: width, height: height), overlayImage: overlayImage, context: ctx)
             drawEffects(model: model, context: ctx, time: CACurrentMediaTime())
             guard let image = ctx.makeImage() else { throw ShowtimeError("Could not render the film frame.") }
             return image
@@ -44,7 +45,7 @@ enum SceneCompositor {
 
     // Only immutable images and geometry cross to the recording worker.
     nonisolated static func drawContent(canvas: CanvasSpec, camera: CameraState, webImage: CGImage,
-                                       backdrop: CGImage, context ctx: CGContext) {
+                                       backdrop: CGImage, overlayImage: CGImage? = nil, context ctx: CGContext) {
         drawImage(backdrop, in: CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height), context: ctx)
         let layout = canvas.layout
         let screen = layout.canvasScreen, page = layout.canvasPage
@@ -60,6 +61,9 @@ enum SceneCompositor {
         ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.1))
         ctx.setLineWidth(0.7 * layout.scale); ctx.addPath(outline); ctx.strokePath()
         ctx.restoreGState()
+        if let overlayImage {
+            drawImage(overlayImage, in: CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height), context: ctx)
+        }
     }
 
     static func browserBackdrop(model: StudioModel, width: Int, height: Int) throws -> CGImage {

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "name": "React reactions over a real Orbit workflow",
+  "canvas": {"width": 1920, "height": 1080, "inset": 64, "frame": "none", "backdrop": "sky"},
+  "recording": {"width": 1920, "height": 1080, "fps": 30},
+  "setup": [
+    {"action": "open", "url": "showtime://demo"},
+    {"action": "waitFor", "selector": "#new-project"},
+    {"action": "waitFor", "script": "!document.hidden && document.querySelector('.content').getAnimations().every(a => a.playState === 'finished')"},
+    {"action": "overlay", "source": "index.html", "props": {"visible": false}},
+    {"action": "cursor", "style": "arrow", "size": 32}
+  ],
+  "steps": [
+    {"id": "start", "action": "wait", "duration": 1},
+    {"action": "overlay", "props": {"label": "Keep clicking", "count": 128, "x": 1510, "y": 340}, "duration": 3},
+    {"action": "click", "selector": "#new-project", "duration": 0.8},
+    {"action": "type", "selector": "#project-name", "text": "Overlay launch", "clear": true, "delay": 0.05},
+    {"action": "type", "selector": "#project-description", "text": "A real workflow with a React animation layer.", "clear": true, "delay": 0.03},
+    {"action": "click", "selector": "#create-project", "duration": 0.5},
+    {"action": "assert", "script": "window.orbit.state.projects.some(p => p.name === 'Overlay launch')"},
+    {"id": "reaction", "action": "overlay", "props": {"label": "Project created!", "count": 129}, "duration": 3},
+    {"action": "wait", "duration": 3.5},
+    {"action": "overlay", "clear": true}
+  ]
+}

@@ -283,6 +283,30 @@ final class ScriptTests {
         try film.validate()
     }
 
+    func testOverlayActionsValidateSourcesPropsAndTrackConflicts() throws {
+        let film = try script(#"{"setup":[{"action":"overlay","source":"/tmp/like overlay/index.html","props":{"visible":false}}],"steps":[{"action":"parallel","steps":[{"action":"overlay","props":{"label":"Liked!","colors":["pink","white"]},"duration":2},{"action":"camera","scale":1.2},{"action":"wait","duration":2}]},{"action":"overlay","clear":true}]}"#)
+        try film.validate()
+        XCTAssertEqual(try film.setup[0].overlaySourceURL?.path, "/tmp/like overlay/index.html")
+        let roundTrip = try JSONDecoder().decode(FilmScript.self, from: JSONEncoder().encode(film))
+        XCTAssertEqual(roundTrip.steps[0].steps?[0].props, film.steps[0].steps?[0].props)
+        for source in ["https://example.com/overlay/", "http://localhost:3001/", "file:///tmp/overlay.html", "~/Movies/overlay.html"] {
+            var action = Action(.overlay); action.source = source
+            try action.validate()
+        }
+        for source in ["", "relative.html", "javascript:alert(1)", "data:text/html,test", "https:", "file://remote/overlay.html"] {
+            var action = Action(.overlay); action.source = source
+            XCTAssertThrowsError(try action.validate())
+        }
+        for json in [
+            #"{"steps":[{"action":"overlay"}]}"#,
+            #"{"steps":[{"action":"overlay","props":[]}]}"#,
+            #"{"steps":[{"action":"overlay","clear":true,"props":{}}]}"#,
+            #"{"steps":[{"action":"overlay","source":"/tmp/like.html","clear":true}]}"#,
+            #"{"steps":[{"action":"overlay","props":{},"duration":-1}]}"#,
+            #"{"steps":[{"action":"parallel","steps":[{"action":"overlay","props":{}},{"action":"overlay","clear":true}]}]}"#,
+        ] { XCTAssertThrowsError(try script(json).validate()) }
+    }
+
     func testCustomCursorMustHaveAnAsset() throws {
         let film = try script(#"{"steps":[{"action":"cursor","style":"custom"}]}"#)
         XCTAssertThrowsError(try film.validate())

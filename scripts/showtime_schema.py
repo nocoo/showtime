@@ -16,7 +16,7 @@ def schema(properties=None, required=None, description=None):
 STR = {"type": "string"}
 BOOL = {"type": "boolean"}
 NUMBER = {"type": "number"}
-DURATION = {"type": "number", "minimum": 0, "maximum": 300, "description": "Seconds. Motion and wait block playback; caption duration does not."}
+DURATION = {"type": "number", "minimum": 0, "maximum": 300, "description": "Seconds. Motion and wait block playback; caption and overlay do not."}
 TARGET = {"selector": STR, "x": NUMBER, "y": NUMBER}
 MOTION = {"duration": DURATION, "easing": {"type": "string", "enum": ["linear", "smooth", "cinematic"]}}
 BACKDROPS = ["mist", "pearl", "midnight", "silver", "cloud", "sky", "mint", "rose", "butter"]
@@ -72,6 +72,11 @@ ACTIONS = {
                       {"text": {"type": "string", "maxLength": 400}, "subtitle": STR, "eyebrow": STR,
                        "style": {"type": "string", "enum": ["glass", "minimal", "title"]},
                        "position": {"type": "string", "enum": ["bottom", "center", "top"]}, "duration": DURATION}),
+    "overlay": action("overlay", "Load a transparent, click-through HTML animation over the full Canvas, or replace props on the loaded page. The page defines window.showtimeOverlay(context), using frame/fps/time/width/height/props. Each update restarts its clock; optional duration hides it without blocking. clear=true hides it. Preload source in setup; sources reload when specified. One layer may contain any number of React/DOM/canvas elements.",
+                      {"source": {"type": "string", "minLength": 1, "description": "Local HTML path, relative to the script, or http(s)/file URL. Built JS, fonts, and images should live beside the HTML."},
+                       "props": {"type": "object", "additionalProperties": True, "description": "JSON props, replacing the previous object; omitting them preserves props unless loading a new source."},
+                       "clear": BOOL, "duration": DURATION,
+                       "timeout": {"type": "number", "minimum": .1, "maximum": 120, "description": "Load/readiness timeout in seconds (default 15). Frame callbacks have a separate 2 second limit."}}),
     "cursor": action("cursor", "Patch cursor appearance. custom requires an image path. Hotspots are fractions of image dimensions. Values carry between design actions; script setup should specify the desired appearance.",
                      {"style": {"type": "string", "enum": ["arrow", "ring", "dot", "hand", "spotlight", "custom"]},
                       "size": {"type": "number", "minimum": 8, "maximum": 96}, "color": STR, "visible": BOOL, "clickEffect": BOOL,
@@ -81,9 +86,9 @@ ACTIONS = {
     "evaluate": action("evaluate", "Evaluate JavaScript, including promises, and return the JSON result. Use native input actions for page interaction.", {"script": STR}, ["script"]),
     "screenshot": action("screenshot", "Save the composed film frame to a new PNG path at this point in playback.", {"output": STR}, ["output"]),
 }
-ACTIONS["parallel"] = action("parallel", "Run independent visual tracks together. One camera/zoom, one move, one caption, plus waits; the group completes when all tracks finish.",
+ACTIONS["parallel"] = action("parallel", "Run independent visual tracks together. One camera/zoom, one move, one caption, one overlay, plus waits; the group completes when all tracks finish.",
                              {"steps": {"type": "array", "minItems": 1, "maxItems": 8,
-                                        "items": {"oneOf": [ACTIONS[name] for name in ("move", "camera", "zoom", "caption", "wait")]}}}, ["steps"])
+                                        "items": {"oneOf": [ACTIONS[name] for name in ("move", "camera", "zoom", "caption", "overlay", "wait")]}}}, ["steps"])
 STEP = {"oneOf": list(ACTIONS.values()), "description": "The identical action object is used for design previews, setup, and script steps. Targets use original webpage CSS coordinates, even after camera transforms."}
 SCRIPT = schema({"version": {"type": "integer", "enum": [1]}, "name": STR, "canvas": CANVAS,
                  "recording": schema({**CAPTURE, "output": STR}),

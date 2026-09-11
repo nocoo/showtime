@@ -1,0 +1,11 @@
+{
+  "name": "showtime-overlay-example",
+  "private": true,
+  "scripts": {
+    "build": "bun build like.jsx --outdir dist --format iife --target browser --production"
+  },
+  "dependencies": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  }
+}

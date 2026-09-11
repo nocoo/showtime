@@ -36,7 +36,7 @@ TOOLS = [
      "inputSchema": schema({"step": STEP, "screenshot": STR, "wait": BOOL, "includeImage": BOOL}, ["step"])},
     {"name": "showtime_validate", "description": "Preflight the entire script and inclusive selected range without executing webpage actions. Checks both setup and steps. mode defaults to rehearse; record also validates a new output path and recording dimensions.",
      "inputSchema": schema({**SOURCE, "mode": {"type": "string", "enum": ["rehearse", "record"]}, "output": STR, "screenshot": STR})},
-    {"name": "showtime_rehearse", "description": "Run setup, then the selected script range locally without starting recording. from/to are inclusive step numbers or IDs. Earlier steps are not replayed. Camera/captions reset before setup; the webpage stays as-is unless setup/steps navigate. Returns a job immediately unless wait=true.",
+    {"name": "showtime_rehearse", "description": "Run setup, then the selected script range locally without starting recording. from/to are inclusive step numbers or IDs. Earlier steps are not replayed. Camera, captions, and overlay reset before setup; the webpage stays as-is unless setup/steps navigate. Returns a job immediately unless wait=true.",
      "inputSchema": schema(PLAYBACK)},
     {"name": "showtime_record", "description": "Run script setup before recording, then execute the selected range locally and finalize MP4. All timing lives in the script; no live action stream. A new output path is required here or in script.recording.output. Returns a job unless wait=true; cancellation saves a playable partial film.",
      "inputSchema": schema({**PLAYBACK, "output": STR})},

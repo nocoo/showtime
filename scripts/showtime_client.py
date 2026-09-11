@@ -126,6 +126,9 @@ def resolve_script_paths(script: dict, base: Path | None = None) -> dict:
             for key in ("output", "image"):
                 if step.get(key):
                     step[key] = absolute_path(step[key], base)
+            if step.get("action") == "overlay" and isinstance(step.get("source"), str) and step["source"]:
+                if not urllib.parse.urlparse(step["source"]).scheme:
+                    step["source"] = absolute_path(step["source"], base)
             walk(step.get("steps", []))
     walk(script.get("steps", []))
     walk(script.get("setup", []))

@@ -30,6 +30,7 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 - **镜头与画面** — 用 Camera 触控板叠加缩放与偏移，脚本同步动画过渡；编排动态标题与并行动作。九种背景保留原有绿色，并加入灰色、淡糖果色与可调中心柔光。Canvas 支持最高 4K（3840 × 2160），浏览器顶栏提供轻量前进、后退和停止加载。
 - **设备框架** — 默认 None；支持 iPhone 16 Pro／Pro Max、iPad Pro 11／13 英寸，以及按 2026 款外观重绘的 MacBook Neo 和 MacBook Pro。Light 为银色；Dark 在 Neo 上为靛蓝色，其余设备为深空黑。Content width 可独立指定屏幕宽度，设备按比例居中，留白自动计算；默认 Auto 保留自动适配。按 Export 分辨率采样网页并绘制外框，支持高清 4K 输出。
 - **演示光标** — 使用 macOS 箭头与手型、圆环、圆点、聚光灯或自定义 PNG，调整大小、颜色、热点和点击效果。
+- **自定义动画层** — Agent 可加载透明 HTML／React 图层，用帧号驱动点赞、贴纸、粒子或标注。图层覆盖 Canvas，保留底层网页的点击与输入，并同步进入预览、PNG 和 MP4。见[使用说明](docs/overlays.md)。
 - **可重复剧本** — 用 JSON 保存动作顺序，先排练，再录制。任务返回进度和每一步的结果，支持异步执行与中途停止。
 - **录制与截图** — 导出 H.264 MP4 或合成画面的 PNG；支持 24、30、60 fps，默认 1920 × 1080 / 30 fps。中止录制会保存可播放的已录部分。
 - **Agent 接入** — Python CLI 和 MCP stdio 服务共用本机控制接口，无第三方 Python 依赖。Agent 可先检查元素，再用选择器执行操作。
@@ -191,6 +192,7 @@ python3 scripts/test_workflow.py
 | [English README](docs/README.en.md) | 英文使用说明 |
 | [剧本示例](examples/) | 本地产品演示与光标配置 |
 | [拍摄指引](docs/directing.md) / [内置 skill](skills/showtime/SKILL.md) | 设计、范围排练、录制、进度和语法发现 |
+| [透明动画图层](docs/overlays.md) / [React 示例](examples/overlay-react/) | CLI／MCP 加载、props、帧回调、点击穿透与录制 |
 | [项目 demo skill](skills/showtime-project-demo/SKILL.md) | 提前收集规格、Remotion 贴片、解说字幕、配乐混音和成片验收；`showtime guide project-demo` |
 | [版本管理](docs/versioning.md) | 版本来源、同步和发布命令 |
 | [变更记录](CHANGELOG.md) | 各版本改动 |

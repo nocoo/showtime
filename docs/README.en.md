@@ -26,6 +26,7 @@ Pages run in WebKit. Recordings include the browser frame, backdrop, presentatio
 - **Camera and composition** — Combine close-up and offsets with the Camera pad, then animate them together in scripts. Choreograph titles and parallel actions. Nine backdrops retain the original green and add presentation gray, pale candy colors, and an adjustable central glow. Canvas supports up to 4K (3840 × 2160); compact browser controls provide Back, Forward, and Stop loading.
 - **Device frames** — Choose iPhone 16 Pro / Pro Max, iPad Pro 11 / 13-inch, or MacBook Neo and MacBook Pro frames redrawn from the 2026 designs, with None as the default. Light uses silver; Dark uses indigo on Neo and space black on other devices. Set Content width to size the screen independently and center the device with more space around it, or keep Auto to fit the Canvas. Web content and hardware render at the Export resolution, including 4K.
 - **Presentation cursors** — Use macOS arrow and hand artwork, a ring, dot, spotlight, or a custom PNG. Adjust size, color, hotspot, and click effects.
+- **Custom animation overlays** — Load transparent HTML/React layers through CLI or MCP for frame-driven reactions, stickers, particles, and annotations. The full-Canvas layer preserves underlying clicks and keyboard input and appears in previews, PNGs, and MP4s. See the [React example](../examples/overlay-react/) and `showtime guide` for the callback contract.
 - **Repeatable scripts** — Save actions as JSON, rehearse, then record. Jobs report progress and individual cue results, support asynchronous execution, and can be stopped early.
 - **Recording and stills** — Export H.264 MP4 or a PNG of the composed canvas. Choose 24, 30, or 60 fps; the default is 1920 × 1080 at 30 fps. Stopping a recording finalizes a playable partial take.
 - **Agent access** — A Python CLI and MCP stdio server share the local control API, with no third-party Python dependencies. Agents can inspect elements before performing actions with selectors.
@@ -183,6 +184,7 @@ python3 scripts/test_workflow.py
 | [中文 README](../README.md) | Chinese usage guide |
 | [Example scripts](../examples/) | Local product demos and cursor configuration |
 | [Bundled skill](../skills/showtime/SKILL.md) | Design, script authoring, range playback, progress, and syntax discovery |
+| [Animation overlays](overlays.md) / [React example](../examples/overlay-react/) | Sources, props, frame callbacks, click-through, and recording |
 | [Project demo skill](../skills/showtime-project-demo/SKILL.md) | Brief intake, Remotion bookends, narration, subtitles, music, and verification; `showtime guide project-demo` |
 | [Version management](versioning.md) | Version source, synchronization, and release commands; Chinese |
 | [Changelog](../CHANGELOG.md) | Changes by version |

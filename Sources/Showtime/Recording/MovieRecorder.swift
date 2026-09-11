@@ -96,6 +96,7 @@ final class MovieRecorder {
         model.rememberRecordingSettings(spec)
         frameCount = 0; captureCount = 0; previousBuffer = nil; totalRenderTime = 0
         startTime = CACurrentMediaTime()
+        model.overlay.startTimeline(at: startTime)
         model.isRecording = true
         model.elapsed = 0
         model.statusText = "Recording a new take"
@@ -115,8 +116,11 @@ final class MovieRecorder {
         let desiredFrame = Int(max(0, time - startTime) * Double(spec.fps))
         guard frameCount <= desiredFrame else { return }
         let renderingStarted = CACurrentMediaTime()
-        let canvas = model.canvas, effects = capturedEffects ?? SceneCompositor.Effects(model.effects)
+        let canvas = model.canvas
+        var effects = capturedEffects ?? SceneCompositor.Effects(model.effects)
+        if capturedEffects == nil { effects.overlayImage = try await model.overlay.snapshot(at: time, pixelWidth: spec.width) }
         let camera = effects.camera
+        let overlayImage = effects.overlayImage
         let backdrop = try SceneCompositor.browserBackdrop(model: model, width: spec.width, height: spec.height)
         guard let pool = adaptor?.pixelBufferPool else { throw ShowtimeError("The video pixel buffer pool is unavailable.") }
         // Composite directly into the encoder buffer without blocking native input
@@ -129,7 +133,7 @@ final class MovieRecorder {
                 }
                 try Self.draw(in: buffer, canvas: canvas) { context in
                     SceneCompositor.drawContent(canvas: canvas, camera: camera, webImage: webImage,
-                                                backdrop: backdrop, context: context)
+                                                backdrop: backdrop, overlayImage: overlayImage, context: context)
                 }
                 return RenderedPixels(buffer: buffer)
             }
