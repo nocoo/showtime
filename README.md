@@ -191,6 +191,7 @@ python3 scripts/test_workflow.py
 | [English README](docs/README.en.md) | 英文使用说明 |
 | [剧本示例](examples/) | 本地产品演示与光标配置 |
 | [拍摄指引](docs/directing.md) / [内置 skill](skills/showtime/SKILL.md) | 设计、范围排练、录制、进度和语法发现 |
+| [项目 demo skill](skills/showtime-project-demo/SKILL.md) | 提前收集规格、Remotion 贴片、解说字幕、配乐混音和成片验收；`showtime guide project-demo` |
 | [版本管理](docs/versioning.md) | 版本来源、同步和发布命令 |
 | [变更记录](CHANGELOG.md) | 各版本改动 |
 | [GitHub Releases](https://github.com/nocoo/showtime/releases) | 已发布版本 |

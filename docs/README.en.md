@@ -183,6 +183,7 @@ python3 scripts/test_workflow.py
 | [中文 README](../README.md) | Chinese usage guide |
 | [Example scripts](../examples/) | Local product demos and cursor configuration |
 | [Bundled skill](../skills/showtime/SKILL.md) | Design, script authoring, range playback, progress, and syntax discovery |
+| [Project demo skill](../skills/showtime-project-demo/SKILL.md) | Brief intake, Remotion bookends, narration, subtitles, music, and verification; `showtime guide project-demo` |
 | [Version management](versioning.md) | Version source, synchronization, and release commands; Chinese |
 | [Changelog](../CHANGELOG.md) | Changes by version |
 | [GitHub Releases](https://github.com/nocoo/showtime/releases) | Published versions |

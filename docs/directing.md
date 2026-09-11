@@ -21,6 +21,8 @@ PATH 只影响当前终端，不修改 shell 配置。MCP 配置通过 `/bin/sh`
 
 有 MCP 的 Agent 先调用 `showtime_help`；`topic: "workflow"` 返回 skill，`topic: "script"` 返回剧本 schema，动作名如 `"camera"` 返回该动作的 schema。CLI 和 MCP 使用同一份语法定义。「Watch an example」明确加载并排练内置 Orbit。
 
+制作带片头片尾、解说或配乐的完整项目 demo 时，读取 [项目 demo skill](../skills/showtime-project-demo/SKILL.md)：CLI 为 `showtime guide project-demo`，MCP 为 `showtime_help(topic: "project-demo")`。它会先收集用户尚未提供的尺寸、内容宽度、设备框、背景、柔光、品牌和声音偏好，再组织 Showtime 录屏、Remotion 贴片与 FFmpeg 混音。Showtime 的原始导出仍是无声视频；已完成画面的配乐修改会复用原视频。两份 skill 都随工具包分发；旧版工具未提供该主题时，可以先直接读取仓库中的 skill 文件，随后按 App 的 Update tools 流程更新。
+
 ## 设计：单个动作与截图
 
 使用 CLI `showtime design` 或 MCP `showtime_design`。设计动作不会开启录制。字幕会保留供截图，直到清除或开始播放；相同字幕在剧本中按 `duration` 计时且不阻塞后续动作。

@@ -39,7 +39,8 @@ def parser():
                                    epilog="Start with 'showtime guide' and 'showtime schema'. Design and script steps use identical JSON actions.")
     root.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
     commands = root.add_subparsers(dest="command", required=True)
-    commands.add_parser("guide", help="Read the bundled directing skill and workflow")
+    guide_parser = commands.add_parser("guide", help="Read the directing or narrated project-demo skill")
+    guide_parser.add_argument("topic", nargs="?", choices=["workflow", "project-demo"], default="workflow")
     schema_parser = commands.add_parser("schema", help="Read the exact script or action JSON schema")
     schema_parser.add_argument("topic", nargs="?", choices=["script", *ACTIONS])
     commands.add_parser("example", help="Print the bundled Orbit JSON script for editing or rehearsal")
@@ -105,7 +106,7 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         if args.command == "guide":
-            print(guide())
+            print(guide(args.topic))
             return 0
         if args.command == "schema":
             print(json.dumps(describe(args.topic), ensure_ascii=False, indent=2))

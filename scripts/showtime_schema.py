@@ -139,7 +139,11 @@ def describe(topic=None):
     return ACTIONS[topic]
 
 
-def guide():
-    bundled = Path(__file__).resolve().parent / "SKILL.md"
-    source = Path(__file__).resolve().parent.parent / "skills/showtime/SKILL.md"
+def guide(topic="workflow"):
+    if topic not in ("workflow", "project-demo"):
+        raise ValueError("Unknown guide topic: " + topic)
+    filename = "PROJECT_DEMO_SKILL.md" if topic == "project-demo" else "SKILL.md"
+    skill = "showtime-project-demo" if topic == "project-demo" else "showtime"
+    bundled = Path(__file__).resolve().parent / filename
+    source = Path(__file__).resolve().parent.parent / "skills" / skill / "SKILL.md"
     return (bundled if bundled.is_file() else source).read_text()

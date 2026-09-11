@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add a project-demo skill for collecting missing creative settings, producing Remotion bookends, timing narration/subtitles, and mixing optional music while preserving approved footage. Expose it through `showtime guide project-demo` and the MCP help topic, and include it in explicit agent-tool installation and package validation.
+
 ## [1.4.0] - 2026-09-11
 
 - Separate Agent design previews from locally executed rehearsal and recording scripts. Share one action grammar across CLI, MCP, setup, and timed steps; replace public live recording commands with script playback.

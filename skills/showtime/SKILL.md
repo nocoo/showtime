@@ -7,6 +7,8 @@ description: Design webpage films in the Showtime macOS app, then rehearse and r
 
 Use two phases: explore the design with individual actions and screenshots, then run a written script for rehearsal and recording. The App executes every script action and wait locally, so model thinking and Agent round trips do not insert gaps. Webpage loads and responses can still vary; use waitFor and assert for those conditions.
 
+Before designing, collect any missing duration, dimensions, content width/device frame, backdrop/glow, caption style, and delivery preferences. Read the current settings and the conversation first; preserve supplied choices and ask only about gaps. For complete project demos with Remotion intro/outro bookends, narration, subtitles, or background music, also read `showtime guide project-demo` or `showtime_help(topic: "project-demo")`. That companion skill covers the brief, brand animation, speech timing, music selection/mixing, and verified delivery; an audio-only revision reuses the approved picture.
+
 ## Connect and discover syntax
 
 Keep Showtime open. If its MCP tools are available, use `showtime_help` with `topic: "workflow"`, `"script"`, or an action name. Otherwise, after the user has installed the bundled tools in AI Director:

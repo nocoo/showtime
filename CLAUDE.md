@@ -9,7 +9,7 @@ Showtime 是 macOS 14+ 的原生 SwiftUI / AppKit / WebKit 浏览器，由 Agent
 - `Sources/Showtime/Director`：剧本调度、并行动作、Theater 进度；`Recording` 负责 Canvas 合成与视频编码。
 - `Sources/ShowtimeCore`：可校验的剧本与录制配置；`Tests/ShowtimeCoreTests` 是可在 Command Line Tools 环境运行的检查程序。
 - `scripts/showtime`、`showtime_cli.py`、`showtime_mcp.py`：CLI / MCP 入口，打包时一起放进 App；不依赖源码目录。
-- CLI / MCP 只在 **AI Director → Agent integration → Install / Update tools** 的显式点击后，通过 `AgentGuide.installTools()` 安装随包的 8 个文件（含 schema 和 SKILL.md）到 `~/Library/Application Support/Showtime/bin`。启动、进入页面和复制指令不能安装工具、执行 Python 或弹出依赖安装窗口。页面按文件内容识别未安装/已安装/待更新；Python 检查只在安装/检查按钮后执行，缺少时在页面提供官方 Python 下载链接与重新检查。普通网页/录制流程不依赖 Python。
+- CLI / MCP 只在 **AI Director → Agent integration → Install / Update tools** 的显式点击后，通过 `AgentGuide.installTools()` 安装随包的 9 个文件（含 schema、SKILL.md 和 PROJECT_DEMO_SKILL.md）到 `~/Library/Application Support/Showtime/bin`。启动、进入页面和复制指令不能安装工具、执行 Python 或弹出依赖安装窗口。页面按文件内容识别未安装/已安装/待更新；Python 检查只在安装/检查按钮后执行，缺少时在页面提供官方 Python 下载链接与重新检查。普通网页/录制流程不依赖 Python。
 - 用户在当前 shell 加入上述 PATH 后使用 `showtime`。MCP 配置调用同一入口的 `showtime mcp`，由 shell 展开 HOME；POSIX shell 入口查找现有 Python 3.10+，支持常见 Homebrew/python.org 路径并跳过 Apple 系统安装占位程序。不要把 `Bundle.main.resourceURL`、`#filePath`、临时下载或验收目录写入面向用户的指令；不要自动修改 shell profile 或系统 PATH。工具升级必须由用户点击；已安装工具与 App 文件一致才显示已就绪，工具不能在签名包内生成字节码。
 - `package.json` 只管理版本与快捷命令，没有 Node 依赖，不运行 npm/bun install，也不生成 lockfile。
 - 默认 Canvas 为 1920 × 1080；视频默认 1920 × 1080、30 fps。已保存的用户设置和显式剧本配置优先。视频宽高必须为偶数，与 Canvas 同比例。

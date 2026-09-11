@@ -36,7 +36,7 @@ def verify_app(app: Path, public: bool) -> tuple[str, str]:
     resources = app / "Contents/Resources"
     for name in ("Showtime.icns", "LICENSE", "Tools/showtime", "Tools/showtime_mcp.py",
                  "Tools/showtime_client.py", "Tools/showtime_cli.py", "Tools/showtime_version.py",
-                 "Tools/showtime_schema.py", "Tools/SKILL.md",
+                 "Tools/showtime_schema.py", "Tools/SKILL.md", "Tools/PROJECT_DEMO_SKILL.md",
                  "Showtime_Showtime.bundle/ShowtimeMark.png", "Showtime_Showtime.bundle/DirectorBrowser.svg",
                  "Showtime_Showtime.bundle/Demo/index.html", "Showtime_Showtime.bundle/Scripts/orbit-launch.json"):
         if not (resources / name).is_file():

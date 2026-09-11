@@ -4,7 +4,7 @@ import ShowtimeCore
 
 enum AgentGuide {
     enum Installation { case missing, updateAvailable, current }
-    private static let toolNames = ["showtime", "showtime_cli.py", "showtime_client.py", "showtime_mcp.py", "showtime_schema.py", "showtime_version.py", "SKILL.md", "package.json"]
+    private static let toolNames = ["showtime", "showtime_cli.py", "showtime_client.py", "showtime_mcp.py", "showtime_schema.py", "showtime_version.py", "SKILL.md", "PROJECT_DEMO_SKILL.md", "package.json"]
 
     static var toolsFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Showtime/bin", isDirectory: true)

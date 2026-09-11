@@ -20,8 +20,8 @@ SOURCE = {
 }
 PLAYBACK = {**SOURCE, "screenshot": STR, "wait": BOOL}
 TOOLS = [
-    {"name": "showtime_help", "description": "Read the bundled directing skill, exact script/action schema, or editable example. Start here: design individual actions, then rehearse and record prewritten scripts.",
-     "inputSchema": schema({"topic": {"type": "string", "enum": ["workflow", "script", "example", *ACTIONS]}})},
+    {"name": "showtime_help", "description": "Read the directing or project-demo skill, exact script/action schema, or editable example. The project-demo topic covers Remotion bookends, narration, subtitles, and background music.",
+     "inputSchema": schema({"topic": {"type": "string", "enum": ["workflow", "project-demo", "script", "example", *ACTIONS]}})},
     {"name": "showtime_status", "description": "Read workflow mode, actual job/recording state, camera transform, held caption, viewport, settings, and director progress. Polling does not create activity.",
      "inputSchema": schema()},
     {"name": "showtime_inspect", "description": "Read visible real webpage controls, selectors, and coordinates. Inspect after navigation or changing the viewport. Camera transforms do not change target coordinates.",
@@ -67,8 +67,8 @@ def call_tool(name, args):
             raise ShowtimeError(flag + " must be a Boolean.")
     if name == "showtime_help":
         topic = args.get("topic", "workflow")
-        if topic == "workflow":
-            return {"content": [{"type": "text", "text": guide()}], "isError": False}
+        if topic in ("workflow", "project-demo"):
+            return {"content": [{"type": "text", "text": guide(topic)}], "isError": False}
         value = Client().request("GET", "/v1/scripts/demo") if topic == "example" else describe(topic)
         return {"content": [{"type": "text", "text": json.dumps(value, ensure_ascii=False, indent=2)}], "isError": False}
 

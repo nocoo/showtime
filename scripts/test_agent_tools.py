@@ -25,7 +25,7 @@ def main():
     app = args.app.resolve()
     installed = Path.home() / "Library/Application Support/Showtime/bin"
     bundled = app / "Contents/Resources/Tools"
-    names = ("showtime", "showtime_cli.py", "showtime_client.py", "showtime_mcp.py", "showtime_schema.py", "showtime_version.py", "SKILL.md", "package.json")
+    names = ("showtime", "showtime_cli.py", "showtime_client.py", "showtime_mcp.py", "showtime_schema.py", "showtime_version.py", "SKILL.md", "PROJECT_DEMO_SKILL.md", "package.json")
     assert (installed / "showtime").exists(), "Click AI Director → Agent integration → Install tools first."
     for name in names:
         assert (installed / name).read_bytes() == (bundled / name).read_bytes(), "Update tools first: " + name
@@ -41,6 +41,7 @@ def main():
     cli = str(installed / "showtime")
     assert run(cli, "--version").strip() == "showtime " + APP_VERSION
     assert run(cli, "guide").strip() == (bundled / "SKILL.md").read_text().strip()
+    assert run(cli, "guide", "project-demo").strip() == (bundled / "PROJECT_DEMO_SKILL.md").read_text().strip()
     assert json.loads(run(cli, "schema", "camera"))["properties"]["flipX"]["type"] == "boolean"
     state = json.loads(run(cli, "status"))
     assert state["ready"] and state["appVersion"] == APP_VERSION
@@ -68,10 +69,11 @@ def main():
         {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "showtime_status", "arguments": {}}},
         {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "showtime_help", "arguments": {"topic": "workflow"}}},
         {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "showtime_help", "arguments": {"topic": "camera"}}},
+        {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "showtime_help", "arguments": {"topic": "project-demo"}}},
     ]
     replies = [json.loads(line) for line in run(config["command"], *config["args"],
                 input="".join(json.dumps(message) + "\n" for message in messages)).splitlines()]
-    assert [reply["id"] for reply in replies] == [1, 2, 3, 4] and all("error" not in reply for reply in replies)
+    assert [reply["id"] for reply in replies] == [1, 2, 3, 4, 5] and all("error" not in reply for reply in replies)
     assert replies[0]["result"]["serverInfo"]["version"] == APP_VERSION
     result = replies[1]["result"]
     assert not result.get("isError")
@@ -79,6 +81,7 @@ def main():
     assert mcp_state["ready"] and mcp_state["appVersion"] == APP_VERSION and mcp_state["url"] == state["url"]
     assert replies[2]["result"]["content"][0]["text"].strip() == (bundled / "SKILL.md").read_text().strip()
     assert json.loads(replies[3]["result"]["content"][0]["text"]) == json.loads(run(cli, "schema", "camera"))
+    assert replies[4]["result"]["content"][0]["text"].strip() == (bundled / "PROJECT_DEMO_SKILL.md").read_text().strip()
     print("PASS Portable MCP configuration completes initialization and status without app or source paths", flush=True)
 
     run("/usr/bin/codesign", "--verify", "--deep", "--strict", str(app))
