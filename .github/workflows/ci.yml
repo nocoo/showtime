@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    uses: nocoo/base-ci/.github/workflows/test-job.yml@ab52d72877d386c9a8fd224e9ac868e88be90539
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f
     with:
       runner: "macos-15"
       runtime: "none"
