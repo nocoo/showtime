@@ -11,18 +11,13 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check version, core behavior, and script syntax
-        run: scripts/test.sh
-      - name: Build the native app
-        # Hosted CI has no personal Apple certificates. This is a build check,
-        # not an artifact signed for public distribution.
-        env:
-          CODE_SIGN_IDENTITY: "-"
-          SHOWTIME_ARCH: universal
-        run: scripts/build.sh release
-      - name: Verify app archive and bundled agent tools
-        run: python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@ab52d72877d386c9a8fd224e9ac868e88be90539
+    with:
+      runner: "macos-15"
+      runtime: "none"
+      timeout-minutes: 15
+      command: |
+        scripts/test.sh
+        scripts/build.sh release
+        python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview
+      env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
