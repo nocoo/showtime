@@ -15,7 +15,6 @@ enum Theme {
     static let accentHex = "#4A8234"
     static let accent = adaptive("accent", light: 0x4A8234, dark: 0xA5D58B)
     static let onAccent = adaptive("onAccent", light: 0xFFFFFF, dark: 0x172513)
-    static let sprout = adaptive("sprout", light: 0xCFE8B5, dark: 0x30452A)
     static let line = adaptive("line", light: 0x273626, dark: 0xB9CCBD, lightAlpha: 0.08, darkAlpha: 0.14)
     static let surface = adaptive("surface", light: 0xF4F6F2, dark: 0x151D19)
     static let panel = adaptive("panel", light: 0xFFFFFF, dark: 0x1D2721)
