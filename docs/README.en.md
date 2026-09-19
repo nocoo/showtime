@@ -12,9 +12,11 @@
   <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4A8234" alt="MIT License" /></a>
 </p>
 
+<p align="center"><img src="images/showtime.jpg" width="960" alt="Showtime workspace with canvas, browser preview and AI Director" /></p>
+
 ---
 
-## What is this?
+## What it does
 
 Showtime turns real webpages, mouse interactions, camera movement, and animated text into repeatable product demonstrations. Work in the native macOS studio or let an agent inspect pages and direct interactions through the CLI or MCP, then record the composed result as MP4.
 
@@ -31,7 +33,9 @@ Pages run in WebKit. Recordings include the browser frame, backdrop, presentatio
 - **Recording and stills** — Export H.264 MP4 or a PNG of the composed canvas. Choose 24, 30, or 60 fps; the default is 1920 × 1080 at 30 fps. Stopping a recording finalizes a playable partial take.
 - **Agent access** — A Python CLI and MCP stdio server share the local control API, with no third-party Python dependencies. Agents can inspect elements before performing actions with selectors.
 
-## Installation
+## Usage
+
+### Installation
 
 Download the universal DMG from [GitHub Releases](https://github.com/nocoo/showtime/releases/latest), open it, and drag `Showtime.app` into Applications. A ZIP archive is also available. The app supports macOS 14+ on Apple Silicon and Intel; browsing and recording require neither Xcode nor source code.
 
@@ -49,12 +53,12 @@ For CLI / MCP access, use **AI Director → Agent integration → Install tools*
 ```sh
 export PATH="$HOME/Library/Application Support/Showtime/bin:$PATH"
 showtime status
-showtime mcp-config
+showtime studio --mode theater
 ```
 
 The entry point remains stable when the app moves. After upgrading, click **Update tools** if prompted. Normal launches and copying a director brief never install tools automatically.
 
-### Build from source
+#### Build from source
 
 Source builds need Swift 6 / Xcode Command Line Tools and Python 3.10+. If developer tools are missing, run `xcode-select --install` first.
 
@@ -75,7 +79,7 @@ showtime record film.json --output ~/Movies/Showtime/orbit-launch.mp4
 
 Use a new output path for each export; existing files are not overwritten. Recording dimensions must match the canvas aspect ratio.
 
-## Commands
+### Commands
 
 After the PATH setup above, run these from any directory. Use `showtime --help` for command options and `showtime schema` for the action grammar.
 
@@ -86,19 +90,20 @@ After the PATH setup above, run these from any directory. Use `showtime --help` 
 | `showtime status` | Inspect page, camera, cursor, recording, and job state |
 | `showtime design '{"action":"open","url":"http://localhost:3000"}'` | Open a page during design; public URLs and `showtime://demo` also work |
 | `showtime inspect` | Get selectors, labels, and coordinates for visible interactive elements |
-| `showtime settings --frame iphone-16-pro --content-width 400` | Set the frame and its inner screen width; use `auto` to fit |
+| `showtime settings --frame iphone-16-pro` | Select the device frame and viewport; `--frame none` restores the browser |
+| `showtime settings --content-width 1200` | Set a centered screen width; `--content-width auto` restores automatic sizing |
 | `showtime design '{"action":"caption","text":"Hello"}' --screenshot /tmp/preview-new.png` | Preview one action and capture the result |
 | `showtime validate film.json` | Preflight the whole script and selected range |
 | `showtime rehearse film.json --from feature --to closing` | Rehearse an inclusive range of step IDs or one-based numbers |
 | `showtime record film.json --output ~/Movies/Showtime/film.mp4` | Run and record a script; add `--no-wait` to return a job ID immediately |
 | `showtime job JOB_ID` / `showtime wait JOB_ID` | Inspect progress or wait for completion |
-| `showtime screenshot /tmp/frame-new.png` | Save the composed canvas, including camera, cursor, and text |
+| `showtime screenshot ~/Movies/Showtime/frame.png` | Save the composed canvas, including camera, cursor, and text |
 | `showtime stop` | Cancel the active job and finalize recorded footage |
 | `showtime mcp-config` / `showtime mcp` | Print MCP configuration or start the stdio bridge |
 
 Design uses individual actions and screenshots. Rehearsal and recording execute prewritten JSON scripts locally, including all waits and transitions. Model thinking and network round trips do not interrupt playback. Design, script `setup`, and script `steps` share the same action objects. Design captions remain visible for inspection; playback captions expire after their duration. Camera actions support zooming in and out, translation, rotation, and horizontal/vertical mirroring.
 
-### Connect an agent
+#### Connect an agent
 
 Run `showtime mcp-config` and merge the output into a client that supports MCP stdio. The configuration invokes the stable `~/Library/Application Support/Showtime/bin/showtime` entry point through `/bin/sh`, which expands HOME. Session credentials are discovered automatically; source and App paths are unnecessary.
 
@@ -106,7 +111,7 @@ Available tools are `showtime_help`, `showtime_status`, `showtime_inspect`, `sho
 
 AI Director's **Copy instructions for your agent** includes the creative brief, current settings, connection instructions, syntax discovery commands, and the complete [bundled skill](../skills/showtime/SKILL.md). The Agent can start without locating a source checkout.
 
-### Write a script
+#### Write a script
 
 Save this as `film.json`, then use `showtime rehearse film.json` and `showtime record film.json --output /tmp/first-take-new.mp4`:
 
@@ -128,7 +133,18 @@ Save this as `film.json`, then use `showtime rehearse film.json` and `showtime r
 
 Playback resets visual effects and runs `setup` before every selected range, outside the MP4. Ranges select steps, not video timecodes; skipped steps are never implicitly replayed. Put required page state in setup. `caption` does not pause subsequent actions; add `wait` when text needs time on screen. See the [local product script](../examples/local-product.json), [cursor examples](../examples/cursor-styles.json), and [Orbit film](../Sources/Showtime/Resources/Scripts/orbit-launch.json) for fuller examples.
 
-## Project structure
+## Development
+
+Swift Package Manager builds the project. Root `package.json` only stores version metadata and shortcuts; no Node dependency installation is needed. In addition to the installation requirements, tests need Node.js to check the bundled website's JavaScript syntax.
+
+| Command | Purpose |
+| --- | --- |
+| `scripts/run.sh` | Build the Debug app and open the studio |
+| `scripts/build.sh release` | Build the Release app at `dist/Showtime.app` |
+| `scripts/test.sh` | Check version consistency, core behavior, and Python / JavaScript syntax |
+| `python3 scripts/version.py check` | Verify generated version files |
+
+### Project structure
 
 ```text
 Sources/
@@ -141,28 +157,7 @@ Tests/ShowtimeCoreTests/     # Standalone Swift checks
 docs/                       # English README and version management
 ```
 
-## Technology
-
-| Layer | Technology |
-| --- | --- |
-| Native interface and input | [SwiftUI](https://developer.apple.com/xcode/swiftui/), [AppKit](https://developer.apple.com/documentation/appkit) |
-| Real webpages | [WebKit](https://webkit.org/) |
-| Video composition and export | [AVFoundation](https://developer.apple.com/av-foundation/) |
-| Scripts and application build | [Swift](https://www.swift.org/), [Swift Package Manager](https://www.swift.org/documentation/package-manager/) |
-| Agent interfaces | [Python](https://www.python.org/) standard library, [MCP](https://modelcontextprotocol.io/), local HTTP |
-
-## Development
-
-Swift Package Manager builds the project. Root `package.json` only stores version metadata and shortcuts; no Node dependency installation is needed. In addition to the installation requirements, tests need Node.js to check the bundled website's JavaScript syntax.
-
-| Command | Purpose |
-| --- | --- |
-| `scripts/run.sh` | Build the Debug app and open the studio |
-| `scripts/build.sh release` | Build the Release app at `dist/Showtime.app` |
-| `scripts/test.sh` | Check version consistency, core behavior, and Python / JavaScript syntax |
-| `python3 scripts/version.py check` | Verify generated version files |
-
-## Testing
+## Tests
 
 | Layer | Coverage | Execution |
 | --- | --- | --- |
@@ -177,13 +172,23 @@ python3 scripts/test_integration.py
 python3 scripts/test_workflow.py
 ```
 
+## Stack
+
+| Layer | Technology |
+| --- | --- |
+| Native interface and input | [SwiftUI](https://developer.apple.com/xcode/swiftui/), [AppKit](https://developer.apple.com/documentation/appkit) |
+| Real webpages | [WebKit](https://webkit.org/) |
+| Video composition and export | [AVFoundation](https://developer.apple.com/av-foundation/) |
+| Scripts and application build | [Swift](https://www.swift.org/), [Swift Package Manager](https://www.swift.org/documentation/package-manager/) |
+| Agent interfaces | [Python](https://www.python.org/) standard library, [MCP](https://modelcontextprotocol.io/), local HTTP |
+
 ## Documentation
 
 | Document | Contents |
 | --- | --- |
 | [中文 README](../README.md) | Chinese usage guide |
 | [Example scripts](../examples/) | Local product demos and cursor configuration |
-| [Bundled skill](../skills/showtime/SKILL.md) | Design, script authoring, range playback, progress, and syntax discovery |
+| [Directing guide](directing.md) / [bundled skill](../skills/showtime/SKILL.md) | Design, script authoring, range playback, progress, and syntax discovery |
 | [Animation overlays](overlays.md) / [React example](../examples/overlay-react/) | Sources, props, frame callbacks, click-through, and recording |
 | [Project demo skill](../skills/showtime-project-demo/SKILL.md) | Brief intake, Remotion bookends, narration, subtitles, music, and verification; `showtime guide project-demo` |
 | [Version management](versioning.md) | Version source, synchronization, and release commands; Chinese |

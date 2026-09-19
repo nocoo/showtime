@@ -35,7 +35,9 @@ Showtime 把真实网页、鼠标操作、镜头运动和动态文字编排成�
 - **录制与截图** — 导出 H.264 MP4 或合成画面的 PNG；支持 24、30、60 fps，默认 1920 × 1080 / 30 fps。中止录制会保存可播放的已录部分。
 - **Agent 接入** — Python CLI 和 MCP stdio 服务共用本机控制接口，无第三方 Python 依赖。Agent 可先检查元素，再用选择器执行操作。
 
-## 安装
+## 使用
+
+### 安装
 
 从 [GitHub Releases](https://github.com/nocoo/showtime/releases/latest) 下载通用 DMG，打开后将 `Showtime.app` 拖入 Applications；也提供 ZIP 压缩包。支持 macOS 14+ 的 Apple Silicon 与 Intel Mac，运行界面无需 Xcode 或源码。
 
@@ -81,7 +83,7 @@ showtime record film.json --output ~/Movies/Showtime/orbit-launch.mp4
 
 每次导出使用新的文件路径，已有文件不会被覆盖。录制分辨率与画布必须保持相同宽高比。
 
-## 命令一览
+### 命令一览
 
 完成上面的终端设置后，以下命令可以在任意目录运行；`showtime --help` 查看完整帮助。源码开发者也可以在仓库根目录使用 `scripts/showtime`。
 
@@ -106,7 +108,7 @@ showtime record film.json --output ~/Movies/Showtime/orbit-launch.mp4
 
 设计阶段可以逐个尝试动作。排练、录制必须先写 JSON，所有动作、过渡和等待都由 App 本地执行，不受 Agent 思考和网络往返的影响。`design` 与剧本 `setup` / `steps` 使用相同语法；设计字幕会持续显示供检查，播放时按 `duration` 消失。镜头支持放大、缩小、平移、旋转和水平／垂直镜像。
 
-### 连接 Agent
+#### 连接 Agent
 
 运行 `showtime mcp-config`，将输出合并到支持 MCP stdio 的客户端配置中，也可以在 AI Director → Connection details 一键复制。配置通过用户目录中的固定入口启动，自动展开当前用户的 HOME；不包含开发目录、临时下载路径或会话凭据。
 
@@ -114,7 +116,7 @@ MCP 提供 `showtime_help`、`showtime_status`、`showtime_settings`、`showtime
 
 AI Director 的 **Copy instructions for your agent** 一键复制创意简报、当前画面设置、连接方式、语法查询命令和完整内置 skill。Agent 无需查找源码。完整流程见 [拍摄指引](docs/directing.md)。
 
-### 编写剧本
+#### 编写剧本
 
 将下面的内容保存为 `film.json`，再执行 `showtime rehearse film.json` 和 `showtime record film.json --output /tmp/first-take-new.mp4`：
 
@@ -136,7 +138,18 @@ AI Director 的 **Copy instructions for your agent** 一键复制创意简报、
 
 每次播放先重置视觉效果并执行 `setup`，准备过程不进入录像。`--from` / `--to` 选择步骤而非视频时间码，不会补跑跳过的步骤；把所需网页状态写在 `setup`。`caption` 不会暂停后续动作，需要展示时长时另加 `wait`。完整示例见[本地产品剧本](examples/local-product.json)、[光标样式](examples/cursor-styles.json)和 [Orbit 演示](Sources/Showtime/Resources/Scripts/orbit-launch.json)。
 
-## 项目结构
+## 开发
+
+Swift Package Manager 管理构建；根目录 `package.json` 仅保存版本和快捷命令，无需安装 Node 依赖。除安装环境外，运行测试还需要 Node.js，用于内置网站 JavaScript 的语法检查。
+
+| 命令 | 用途 |
+| --- | --- |
+| `scripts/run.sh` | 构建 Debug 应用并打开工作台 |
+| `scripts/build.sh release` | 构建 Release 应用到 `dist/Showtime.app` |
+| `scripts/test.sh` | 检查版本、核心行为以及 Python / JavaScript 语法 |
+| `python3 scripts/version.py check` | 检查版本文件是否一致 |
+
+### 项目结构
 
 ```text
 Sources/
@@ -148,27 +161,6 @@ examples/                   # 自定义剧本与光标示例
 Tests/ShowtimeCoreTests/     # 独立 Swift 检查程序
 docs/                       # 英文 README 与版本管理
 ```
-
-## 技术栈
-
-| 层 | 技术 |
-| --- | --- |
-| 原生界面与输入 | [SwiftUI](https://developer.apple.com/xcode/swiftui/)、[AppKit](https://developer.apple.com/documentation/appkit) |
-| 真实网页 | [WebKit](https://webkit.org/) |
-| 视频合成与导出 | [AVFoundation](https://developer.apple.com/av-foundation/) |
-| 脚本与应用构建 | [Swift](https://www.swift.org/)、[Swift Package Manager](https://www.swift.org/documentation/package-manager/) |
-| Agent 接口 | [Python](https://www.python.org/) 标准库、[MCP](https://modelcontextprotocol.io/)、本机 HTTP |
-
-## 开发
-
-Swift Package Manager 管理构建；根目录 `package.json` 仅保存版本和快捷命令，无需安装 Node 依赖。除安装环境外，运行测试还需要 Node.js，用于内置网站 JavaScript 的语法检查。
-
-| 命令 | 用途 |
-| --- | --- |
-| `scripts/run.sh` | 构建 Debug 应用并打开工作台 |
-| `scripts/build.sh release` | 构建 Release 应用到 `dist/Showtime.app` |
-| `scripts/test.sh` | 检查版本、核心行为以及 Python / JavaScript 语法 |
-| `python3 scripts/version.py check` | 检查版本文件是否一致 |
 
 ## 测试
 
@@ -185,6 +177,16 @@ python3 scripts/test_integration.py
 python3 scripts/test_workflow.py
 ```
 
+## 技术栈
+
+| 层 | 技术 |
+| --- | --- |
+| 原生界面与输入 | [SwiftUI](https://developer.apple.com/xcode/swiftui/)、[AppKit](https://developer.apple.com/documentation/appkit) |
+| 真实网页 | [WebKit](https://webkit.org/) |
+| 视频合成与导出 | [AVFoundation](https://developer.apple.com/av-foundation/) |
+| 脚本与应用构建 | [Swift](https://www.swift.org/)、[Swift Package Manager](https://www.swift.org/documentation/package-manager/) |
+| Agent 接口 | [Python](https://www.python.org/) 标准库、[MCP](https://modelcontextprotocol.io/)、本机 HTTP |
+
 ## 文档
 
 | 文档 | 内容 |
@@ -199,6 +201,6 @@ python3 scripts/test_workflow.py
 | [GitHub Releases](https://github.com/nocoo/showtime/releases) | 已发布版本 |
 | [Hexly 项目页](https://hexly.ai/logos/showtime) | 项目介绍与图标 |
 
-## License
+## 许可证
 
 [MIT](LICENSE) © 2026 NOCOO
