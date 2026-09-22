@@ -1,6 +1,6 @@
 # 开发约束、验收与发布细则
 
-Detailed project constraints and procedures. The root [CLAUDE.md](../CLAUDE.md) defines the quality contract and records current enforcement gaps.
+Detailed project constraints and procedures. The root [AGENTS.md](../AGENTS.md) defines the quality contract and records current enforcement gaps.
 
 ## 项目结构与约束
 

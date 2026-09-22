@@ -56,7 +56,7 @@ DEVELOPMENT_TEAM=93WWLTN9XU SHOWTIME_ARCH=universal scripts/build.sh release
 python3 scripts/package_release.py --notary-profile showtime-notary
 ```
 
-构建脚本对 Developer ID 启用 Hardened Runtime 和 timestamp。打包脚本先验证版本、完整资源、通用架构与签名，再提交 Apple 公证。只有 `Accepted` 后才会 staple、运行 Gatekeeper 检查、生成 ZIP，并对 ZIP 解压后的 App 再次验签、校验票据与内置 CLI。ZIP、SHA-256 和本地验证记录保存在 `dist/release-vX.Y.Z/`。打包脚本不会提交、推送、打 tag 或创建 GitHub Release，发布步骤见根 [CLAUDE.md](../CLAUDE.md)。
+构建脚本对 Developer ID 启用 Hardened Runtime 和 timestamp。打包脚本先验证版本、完整资源、通用架构与签名，再提交 Apple 公证。只有 `Accepted` 后才会 staple、运行 Gatekeeper 检查、生成 ZIP，并对 ZIP 解压后的 App 再次验签、校验票据与内置 CLI。ZIP、SHA-256 和本地验证记录保存在 `dist/release-vX.Y.Z/`。打包脚本不会提交、推送、打 tag 或创建 GitHub Release，发布步骤见根 [AGENTS.md](../AGENTS.md)。
 
 缺少分发证书时，可以验证本地通用包，但名称会明确包含 `local-preview`，不能作为正式 Release 资产：
 
