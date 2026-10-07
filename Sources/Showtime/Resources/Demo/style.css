@@ -1,5 +1,5 @@
 @charset "UTF-8";
-:root{--bg:#fbfcfa;--panel:#fff;--sidebar:#f6f8f3;--ink:#253126;--muted:#7d8796;--line:#e7ece3;--accent:#4a8234;--accent-soft:#edf4e6;--green:#378468;--lime:#dcf6b8;--shadow:0 8px 30px #2028340a;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;color:var(--ink);font-size:14px;font-synthesis:none;-webkit-font-smoothing:antialiased}
+:root{--bg:#fbfcfa;--panel:#fff;--sidebar:#f6f8f3;--ink:#253126;--muted:#7d8796;--line:#e7ece3;--accent:#4a8234;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;color:var(--ink);font-size:14px;font-synthesis:none;-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}body{margin:0;overflow:hidden;background:var(--bg)}button,input,textarea,select{font:inherit}button{cursor:pointer;color:inherit}button,a,input,textarea,select{outline-offset:3px}button:focus-visible,a:focus-visible{outline:2px solid #75a859}button{border:0;background:none}a{color:inherit;text-decoration:none}svg{display:block;flex-shrink:0}button svg{pointer-events:none}input,textarea{color:var(--ink)}::selection{background:#dceccc}
 .icon{width:18px;height:18px;stroke:currentColor;stroke-width:1.65;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .app-shell{height:100vh;display:grid;grid-template-columns:216px minmax(0,1fr)}
@@ -69,7 +69,6 @@
 .button.accent{background:#4a8234;border-color:#4a8234;color:#fff}
 .button.accent:hover{background:#3e702b}
 .button.soft{background:#e8f1e4;border-color:transparent;color:#5b8849}
-.button.full{width:100%}
 .status-pill{display:flex;align-items:center;gap:6px;border:1px solid #e5eae4;border-radius:20px;padding:6px 9px;font-size:11px;color:#899489;background:#fcfdfb}
 .status-pill i{height:4px;width:4px;border-radius:50%;background:#89a47d}
 .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-bottom:19px}
@@ -149,7 +148,6 @@
 .table-due{color:#919ba8;font-size:12px}
 .table-people .avatar{width:20px;height:20px;font-size:8px}
 .project-trailing .icon{width:13px;color:#aeb4bd}
-.projects-heading{margin-bottom:22px}
 .project-tools{display:flex;align-items:center;gap:9px;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:21px}
 .filter-tabs{display:flex;gap:4px}
 .filter-tab{font-size:12px;color:#959ca8;padding:7px 10px;border:1px solid transparent;border-radius:6px}
@@ -303,11 +301,8 @@
 .plan-price small{font-size:13px;letter-spacing:0;color:#93b088}
 .keyboard-key{display:inline-block;border:1px solid #e5e8ed;border-bottom-width:2px;border-radius:4px;padding:3px 6px;font-size:13px;color:#96a0ae;background:#fcfcfb}
 .help-line{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#8f99a8;padding:12px 0;border-bottom:1px solid #f0f2f6}
-.invite-chip{font-size:13px;padding:8px 10px;border:1px solid #e1ebde;background:#f0f7ed;border-radius:6px;color:#759f65;margin:10px 0}
-.analytics-range-label{font-size:12px;color:#a4aeba}
 .new-project-glow{animation:newGlow 2s ease}
 .muted{color:#a1aab7}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @keyframes contentIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
