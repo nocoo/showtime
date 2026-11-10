@@ -1,0 +1,286 @@
+# CI slot standard v1 (nocoo/base-ci docs/slots.md): native macOS impl slots + na slots skipped.
+# Inlined steps (no nested base-ci reusable workflows) so GitHub checks render as quality / <ID>: <Name> only.
+name: Showtime Quality Slots
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  s1-typecheck:
+    name: "S1: Typecheck"
+    runs-on: macos-26
+    timeout-minutes: 20
+    outputs:
+      tested-sha: ${{ steps.record-sha.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: S1 typecheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/version.py check
+          node --check Sources/Showtime/Resources/Demo/app.js
+          swift build --package-path .
+      - name: Record SHA
+        id: record-sha
+        if: always()
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  s2-lint:
+    name: "S2: Lint"
+    if: ${{ vars.SHOWTIME_SLOT_S2_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "S2 not applicable"
+
+  s3-workflow-lint:
+    name: "S3: Workflow Lint"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tested-sha: ${{ steps.record-sha.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install verified actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+      - name: Validate workflow syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/actionlint"
+      - name: Check immutable shared workflow references
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import pathlib, re, yaml
+          files = list(pathlib.Path(".github/workflows").glob("*.y*ml"))
+          references = []
+          for path in files:
+              data = yaml.safe_load(path.read_text())
+              for job in data.get("jobs", {}).values():
+                  references.extend(item["uses"] for item in [job, *job.get("steps", [])] if "uses" in item)
+          for ref in references:
+              if ref.startswith("nocoo/base-ci/") and not re.fullmatch(r"nocoo/base-ci/[^@]+@[a-f0-9]{40}", ref):
+                  raise SystemExit(f"Shared CI reference must use a full commit SHA: {ref}")
+          print(f"Validated {len(files)} workflow files and immutable base-ci references")
+          PY
+      - name: Check YAML style
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet 'yamllint==1.38.0'
+          yamllint -d '{extends: default, rules: {line-length: disable, document-start: disable, truthy: disable}}' .github/workflows/*.yml
+      - name: Record SHA
+        id: record-sha
+        if: always()
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  g1-secret-scan:
+    name: "G1: Secret Scan"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tested-sha: ${{ steps.record-sha.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install security scanners (gitleaks + osv-scanner)
+        uses: nocoo/base-ci/.github/actions/setup-security-scanners@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+      - name: G1 gitleaks detect
+        shell: bash
+        run: gitleaks detect --no-banner --verbose --redact --no-git
+      - name: Record SHA
+        id: record-sha
+        if: always()
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  g2-dependency-vulnerabilities:
+    name: "G2: Dependency Vulnerabilities"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tested-sha: ${{ steps.record-sha.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install security scanners (gitleaks + osv-scanner)
+        uses: nocoo/base-ci/.github/actions/setup-security-scanners@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+      - name: G2 OSV lockfile scan
+        shell: bash
+        run: osv-scanner scan --lockfile=examples/overlay-react/bun.lock
+      - name: Record SHA
+        id: record-sha
+        if: always()
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  b1-build:
+    name: "B1: Build"
+    runs-on: macos-26
+    timeout-minutes: 20
+    outputs:
+      tested-sha: ${{ steps.record-sha.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Configure test environment
+        uses: nocoo/base-ci/.github/actions/configure-env@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+        with:
+          env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
+      - name: B1 release build and local preview package
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/build.sh release
+          python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview
+      - name: Record SHA
+        id: record-sha
+        if: always()
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l1-unit-tests:
+    name: "L1: Unit Tests & Coverage"
+    runs-on: macos-26
+    timeout-minutes: 20
+    outputs:
+      tested-sha: ${{ steps.record-sha.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: L1 unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/build.sh
+          sh -n scripts/showtime
+          swift run --package-path . ShowtimeChecks
+          python3 -m py_compile scripts/*.py
+          python3 scripts/test_guides.py
+      - name: Record SHA
+        id: record-sha
+        if: always()
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l15-worker-runtime:
+    name: "L1.5: Worker Runtime Tests"
+    if: ${{ vars.SHOWTIME_SLOT_L15_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "L1.5 not applicable"
+
+  l2-api-e2e:
+    name: "L2: API E2E"
+    if: ${{ vars.SHOWTIME_SLOT_L2_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "L2 not applicable"
+
+  l3-browser-e2e:
+    name: "L3: Browser E2E"
+    if: ${{ vars.SHOWTIME_SLOT_L3_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "L3 not applicable"
+
+  p1-package-check:
+    name: "P1: Package Check"
+    if: ${{ vars.SHOWTIME_SLOT_P1_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "P1 not applicable"
+
+  z1-gate:
+    name: "Z1: Gate"
+    needs:
+      - s1-typecheck
+      - s2-lint
+      - s3-workflow-lint
+      - g1-secret-scan
+      - g2-dependency-vulnerabilities
+      - b1-build
+      - l1-unit-tests
+      - l15-worker-runtime
+      - l2-api-e2e
+      - l3-browser-e2e
+      - p1-package-check
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Z1 aggregate slot jobs
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          S1_SHA: ${{ needs.s1-typecheck.outputs.tested-sha }}
+          S3_SHA: ${{ needs.s3-workflow-lint.outputs.tested-sha }}
+          G1_SHA: ${{ needs.g1-secret-scan.outputs.tested-sha }}
+          G2_SHA: ${{ needs.g2-dependency-vulnerabilities.outputs.tested-sha }}
+          L1_SHA: ${{ needs.l1-unit-tests.outputs.tested-sha }}
+          B1_SHA: ${{ needs.b1-build.outputs.tested-sha }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, sys
+
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          impl = [
+              "s1-typecheck",
+              "s3-workflow-lint",
+              "g1-secret-scan",
+              "g2-dependency-vulnerabilities",
+              "b1-build",
+              "l1-unit-tests",
+          ]
+          na = [
+              "s2-lint",
+              "l15-worker-runtime",
+              "l2-api-e2e",
+              "l3-browser-e2e",
+              "p1-package-check",
+          ]
+          bad_impl = [job for job in impl if needs[job]["result"] != "success"]
+          bad_na = [job for job in na if needs[job]["result"] != "skipped"]
+          if bad_impl:
+              print("Implemented slot jobs not successful:", ", ".join(bad_impl))
+              sys.exit(1)
+          if bad_na:
+              print("NA slot jobs must be skipped:", ", ".join(bad_na))
+              sys.exit(1)
+          PY
+          for label in S1_SHA S3_SHA G1_SHA G2_SHA L1_SHA B1_SHA; do
+            value="${!label}"
+            test -n "$value"
+            test "$value" = "$EXPECTED_SHA"
+          done
+          echo "Verified CI source ${EXPECTED_SHA}"

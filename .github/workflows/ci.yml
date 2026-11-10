@@ -1,3 +1,5 @@
+# CI slot standard v1 (nocoo/base-ci docs/slots.md): impl S1, S3, G1, G2, B1, L1, Z1 via showtime-quality.yml;
+# na S2, L1.5, L2, L3, P1 skipped in slot jobs. nocoo/base-ci v2026.12 actions pin; 不用 nocoo/base-ci quality.yml。
 name: macOS build
 
 on:
@@ -6,18 +8,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  build:
-    uses: nocoo/base-ci/.github/workflows/test-job.yml@633a5545fcfec91b688840650d4edf3e9cc1abbd # v2026.10
-    with:
-      runner: "macos-26"
-      runtime: "none"
-      timeout-minutes: 15
-      command: |
-        scripts/test.sh
-        scripts/build.sh release
-        python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview
-      env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
+  quality:
+    uses: ./.github/workflows/showtime-quality.yml
