@@ -62,7 +62,9 @@ jobs:
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
       - name: Validate workflow syntax
         shell: bash
-        run: "${RUNNER_TEMP}/actionlint"
+        run: |
+          set -euo pipefail
+          "${RUNNER_TEMP}/actionlint"
       - name: Check immutable shared workflow references
         shell: bash
         run: |
