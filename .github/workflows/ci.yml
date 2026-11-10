@@ -1,3 +1,5 @@
+# CI slot standard v1 (nocoo/base-ci docs/slots.md): impl S1, S3, G1, G2, B1, L1, Z1 on macOS/ubuntu jobs;
+# na S2, L1.5, L2, L3, P1 in slot-status. quality.yml 不适用：Swift/macOS-26 统一签名构建与 native test-job，无根 lockfile 的 JS CI。nocoo/base-ci v2026.12.
 name: macOS build
 
 on:
@@ -6,18 +8,116 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  build:
-    uses: nocoo/base-ci/.github/workflows/test-job.yml@633a5545fcfec91b688840650d4edf3e9cc1abbd # v2026.10
+  # ── S1: Typecheck ──
+  s1-typecheck:
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
     with:
-      runner: "macos-26"
-      runtime: "none"
-      timeout-minutes: 15
+      slot-label: "S1: Typecheck"
+      runner: macos-26
+      runtime: none
+      timeout-minutes: 20
       command: |
-        scripts/test.sh
+        set -euo pipefail
+        python3 scripts/version.py check
+        node --check Sources/Showtime/Resources/Demo/app.js
+        swift build --package-path .
+
+  # ── S3: Workflow Lint ──
+  s3-workflow-lint:
+    uses: nocoo/base-ci/.github/workflows/workflow-lint.yml@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+    with:
+      yamllint: true
+
+  # ── G1: Secret Scan ──
+  g1-secret-scan:
+    uses: nocoo/base-ci/.github/workflows/security.yml@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+    with:
+      scan-secrets: true
+      scan-dependencies: false
+
+  # ── G2: Dependency Vulnerabilities ──
+  g2-dependency-vulnerabilities:
+    uses: nocoo/base-ci/.github/workflows/security.yml@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+    with:
+      scan-secrets: false
+      scan-dependencies: true
+      lockfiles: examples/overlay-react/bun.lock
+
+  # ── L1: Unit Tests & Coverage ──
+  l1-unit-tests:
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+    with:
+      slot-label: "L1: Unit Tests & Coverage"
+      runner: macos-26
+      runtime: none
+      timeout-minutes: 20
+      command: |
+        set -euo pipefail
+        bash -n scripts/build.sh
+        sh -n scripts/showtime
+        swift run --package-path . ShowtimeChecks
+        python3 -m py_compile scripts/*.py
+        python3 scripts/test_guides.py
+
+  # ── B1: Build ──
+  b1-build:
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+    with:
+      slot-label: "B1: Build"
+      runner: macos-26
+      runtime: none
+      timeout-minutes: 20
+      command: |
+        set -euo pipefail
         scripts/build.sh release
         python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview
       env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
+
+  # ── Z1: Gate ──
+  z1-gate:
+    name: "Z1: Gate"
+    runs-on: ubuntu-latest
+    needs:
+      - s1-typecheck
+      - s3-workflow-lint
+      - g1-secret-scan
+      - g2-dependency-vulnerabilities
+      - l1-unit-tests
+      - b1-build
+    if: always()
+    steps:
+      - name: Z1 aggregate slot jobs
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          S1_SHA: ${{ needs.s1-typecheck.outputs.tested-sha }}
+          S3_SHA: ${{ needs.s3-workflow-lint.outputs.tested-sha }}
+          G1_SHA: ${{ needs.g1-secret-scan.outputs.tested-sha }}
+          G2_SHA: ${{ needs.g2-dependency-vulnerabilities.outputs.tested-sha }}
+          L1_SHA: ${{ needs.l1-unit-tests.outputs.tested-sha }}
+          B1_SHA: ${{ needs.b1-build.outputs.tested-sha }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, sys
+
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          bad = [job for job, meta in needs.items() if meta.get("result") != "success"]
+          if bad:
+              print("CI slot jobs not successful:", ", ".join(bad))
+              sys.exit(1)
+          PY
+          for label in S1_SHA S3_SHA G1_SHA G2_SHA L1_SHA B1_SHA; do
+            value="${!label}"
+            test -n "$value"
+            test "$value" = "$EXPECTED_SHA"
+          done
+          echo "Verified CI source ${EXPECTED_SHA}"
