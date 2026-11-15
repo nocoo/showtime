@@ -36,21 +36,24 @@ SHOWTIME_ARCH=universal scripts/build.sh release
 
 ## Testing and quality contract
 
-6DQ keeps its name with unified L1, L2/L3, G2 and D1; the owner merged former G1 into L1 on 2026-09-21. Statuses: `enforced`, `planned`, `manual`, or `N/A`; partial enforcement below does not certify the full required bar.
-Unified L1 requires statements, branches, functions and lines each ≥95%, with no skipped/focused tests; strict check-only types and lint/format with zero errors/warnings; installed hooks and failure rejection. Preserve any stricter package threshold. Native tools must identify unmeasured metrics as gaps.
-G2 requires dependency and secret scans, with missing required scanners failing.
+Quality follows `system1-quality` (12 slots `S1..Z1` in `.github/workflows/quality-slots.yml`, `nocoo/base-ci v2026.15` for pinned actions). Statuses: `impl`, `na`, `manual`, or `planned`.
 
-| Dimension | Status | Required proof and current evidence/gap |
-|---|---|---|
-| L1 Swift / Python | planned | CI runs standalone Swift core checks and guide checks plus version/syntax/Python compilation/JS checks and builds; no four-metric ≥95% coverage gate and zero-warning lint/format remains incomplete. |
-| L2 local control API | manual | Integration runner exercises real HTTP/auth/input; complete endpoint/method coverage is not enforced. |
-| L3 native / CLI / MP4 | manual | Workflow/studio/capture/frame/tool runners are mapped to changes in the development document; inspect actual video frames. |
-| G2 | planned | No automated secret/dependency scanning; bundled tools still require secret review. |
-| D1 | manual | Dedicated bundle/port/connection, fresh outputs and serial app interaction are required; isolation is not a complete automated gate. |
+| Slot | Status | Implementation / Evidence |
+| --- | --- | --- |
+| S1: Typecheck | impl | `python3 scripts/version.py check`, `node --check Sources/Showtime/Resources/Demo/app.js`, `swift build --package-path .` |
+| S2: Lint | na | No dedicated lint gate configured |
+| S3: Workflow Lint | impl | `actionlint`, immutable `nocoo/base-ci` SHA check, and `yamllint` |
+| G1: Secret Scan | impl | `gitleaks detect --no-banner --verbose --redact --no-git` |
+| G2: Dependency Vulnerabilities | impl | `osv-scanner scan --lockfile=examples/overlay-react/bun.lock` |
+| B1: Build | impl | `scripts/build.sh release` (universal, ad-hoc signed) and `scripts/package_release.py --local-preview` |
+| L1: Unit Tests & Coverage | impl | `bash -n`, `sh -n`, `swift run --package-path . ShowtimeChecks`, `py_compile`, and `scripts/test_guides.py` |
+| L2: Runtime | na | Not a Cloudflare Worker project |
+| L3: Integration | na (manual) | `scripts/test_integration.py` runs manually against an unlocked GUI session |
+| L4: E2E | na (manual) | `scripts/test_workflow.py` and media/capture runners run manually on an unlocked desktop |
+| P1: Package Check | na | Native macOS app/SwiftPM package; not published to npm |
+| Z1: Gate | impl | Aggregates all 11 slot outcomes and verifies `tested-sha` |
 
-CI runs `scripts/test.sh`, a universal release build with explicit ad-hoc signing, and local-preview packaging. It does not run desktop acceptance, personal signing, notarization or publication.
-
-Target hooks: pre-commit checks unified L1 against the index snapshot (`git checkout-index`) in <30s; pre-push checks L2 and G2 in parallel against every stdin push ref/commit in <3min, plus build where applicable. L3 runs in CI or an explicit manual lane.
+No local Git hooks are installed. CI runs `quality` via `.github/workflows/ci.yml` → `quality-slots.yml`.
 Never bypass commit/push hooks, force-push, or use autofix in checks. Documentation changes do not authorize deploying or implementing new gates.
 
 ## Resources and isolation

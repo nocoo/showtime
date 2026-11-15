@@ -1,4 +1,4 @@
-# CI slot standard v1 (nocoo/base-ci docs/slots.md): native macOS impl slots + na slots skipped.
+# CI slot standard v1.3.0 (system1-quality): native macOS impl slots + na slots skipped.
 # Inlined steps (no nested base-ci reusable workflows) so GitHub checks render as quality / <ID>: <Name> only.
 name: Showtime Quality Slots
 
@@ -35,10 +35,10 @@ jobs:
 
   s2-lint:
     name: "S2: Lint"
-    if: ${{ vars.SHOWTIME_SLOT_S2_ENABLED == 'true' }}
+    if: ${{ vars.ENABLE_S2 == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - run: echo "S2 not applicable"
+      - run: echo "na — no dedicated lint gate configured"
 
   s3-workflow-lint:
     name: "S3: Workflow Lint"
@@ -81,6 +81,9 @@ jobs:
           for ref in references:
               if ref.startswith("nocoo/base-ci/") and not re.fullmatch(r"nocoo/base-ci/[^@]+@[a-f0-9]{40}", ref):
                   raise SystemExit(f"Shared CI reference must use a full commit SHA: {ref}")
+          required = ".github/workflows/quality-slots.yml"
+          if not any(required in ref for ref in references):
+              raise SystemExit(f"Missing required reusable workflow: {required}")
           print(f"Validated {len(files)} workflow files and immutable base-ci references")
           PY
       - name: Check YAML style
@@ -107,7 +110,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install security scanners (gitleaks + osv-scanner)
-        uses: nocoo/base-ci/.github/actions/setup-security-scanners@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+        uses: nocoo/base-ci/.github/actions/setup-security-scanners@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
       - name: G1 gitleaks detect
         shell: bash
         run: gitleaks detect --no-banner --verbose --redact --no-git
@@ -129,7 +132,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install security scanners (gitleaks + osv-scanner)
-        uses: nocoo/base-ci/.github/actions/setup-security-scanners@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+        uses: nocoo/base-ci/.github/actions/setup-security-scanners@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
       - name: G2 OSV lockfile scan
         shell: bash
         run: osv-scanner scan --lockfile=examples/overlay-react/bun.lock
@@ -151,7 +154,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Configure test environment
-        uses: nocoo/base-ci/.github/actions/configure-env@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
+        uses: nocoo/base-ci/.github/actions/configure-env@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
         with:
           env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
       - name: B1 release build and local preview package
@@ -192,33 +195,33 @@ jobs:
         shell: bash
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  l15-worker-runtime:
-    name: "L1.5: Worker Runtime Tests"
-    if: ${{ vars.SHOWTIME_SLOT_L15_ENABLED == 'true' }}
+  l2-runtime:
+    name: "L2: Runtime"
+    if: ${{ vars.ENABLE_L2 == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - run: echo "L1.5 not applicable"
+      - run: echo "na — not a Worker project"
 
-  l2-api-e2e:
-    name: "L2: API E2E"
-    if: ${{ vars.SHOWTIME_SLOT_L2_ENABLED == 'true' }}
+  l3-integration:
+    name: "L3: Integration"
+    if: ${{ vars.ENABLE_L3 == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - run: echo "L2 not applicable"
+      - run: echo "na — local HTTP integration runner requires unlocked GUI session"
 
-  l3-browser-e2e:
-    name: "L3: Browser E2E"
-    if: ${{ vars.SHOWTIME_SLOT_L3_ENABLED == 'true' }}
+  l4-e2e:
+    name: "L4: E2E"
+    if: ${{ vars.ENABLE_L4 == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - run: echo "L3 not applicable"
+      - run: echo "na — native/media acceptance runs manually on unlocked desktop"
 
   p1-package-check:
     name: "P1: Package Check"
-    if: ${{ vars.SHOWTIME_SLOT_P1_ENABLED == 'true' }}
+    if: ${{ vars.ENABLE_P1 == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - run: echo "P1 not applicable"
+      - run: echo "na — native app/SwiftPM package, not published to npm"
 
   z1-gate:
     name: "Z1: Gate"
@@ -230,9 +233,9 @@ jobs:
       - g2-dependency-vulnerabilities
       - b1-build
       - l1-unit-tests
-      - l15-worker-runtime
-      - l2-api-e2e
-      - l3-browser-e2e
+      - l2-runtime
+      - l3-integration
+      - l4-e2e
       - p1-package-check
     if: always()
     runs-on: ubuntu-latest
@@ -264,9 +267,9 @@ jobs:
           ]
           na = [
               "s2-lint",
-              "l15-worker-runtime",
-              "l2-api-e2e",
-              "l3-browser-e2e",
+              "l2-runtime",
+              "l3-integration",
+              "l4-e2e",
               "p1-package-check",
           ]
           bad_impl = [job for job in impl if needs[job]["result"] != "success"]
