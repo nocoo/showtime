@@ -60,7 +60,19 @@ enum AgentGuide {
         // MCP clients do not expand ~ or $HOME in plain JSON arguments. Let
         // the shell expand this fixed, quoted path without embedding a username.
         let value: [String: Any] = ["mcpServers": ["showtime": ["command": "/bin/sh", "args": ["-c", #"exec "$HOME/Library/Application Support/Showtime/bin/showtime" mcp"#]]]]
-        return String(decoding: try! JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]), as: UTF8.self)
+        guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+              let text = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return text
+    }
+
+    private static func encodeJSON<T: Encodable>(_ value: T) -> String {
+        guard let data = try? JSONEncoder().encode(value),
+              let text = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return text
     }
 
     static let cliSetup = #"export PATH="$HOME/Library/Application Support/Showtime/bin:$PATH""#
@@ -75,9 +87,9 @@ enum AgentGuide {
     }
 
     static func prompt(website: String, brief: String, seconds: Int, exportFolder: URL, canvas: CanvasSpec, video: RecordingSpec, toolsInstalled: Bool, pythonReady: Bool?) -> String {
-        let canvasJSON = String(decoding: try! JSONEncoder().encode(canvas), as: UTF8.self)
+        let canvasJSON = encodeJSON(canvas)
         var exportSpec = video; exportSpec.output = nil
-        let videoJSON = String(decoding: try! JSONEncoder().encode(exportSpec), as: UTF8.self)
+        let videoJSON = encodeJSON(exportSpec)
         let cliPreparation: String
         if !toolsInstalled {
             cliPreparation = "For CLI access, first have the user select Install tools (or Update tools) in Showtime → AI Director → Agent integration. Python 3.10+ is required; that page provides a download link if needed. Opening Showtime or copying this brief does not install tools."

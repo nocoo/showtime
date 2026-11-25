@@ -11,8 +11,8 @@ final class HTTPTests {
         let header=Data("POST /v1/actions HTTP/1.1\r\nHost: localhost:19840\r\nContent-Length: \(body.count)\r\n\r\n".utf8)
         XCTAssertNil(try HTTPParser.parse(header+body.dropLast()))
         let request=try XCTUnwrap(HTTPParser.parse(header+body))
-        XCTAssertEqual(request.body,body)
-        XCTAssertEqual(request.path,"/v1/actions")
+        XCTAssertEqual(request.body, body)
+        XCTAssertEqual(request.path, "/v1/actions")
     }
 
     func testDuplicateLengthIsRejectedToAvoidRequestSmuggling() {
@@ -31,11 +31,11 @@ final class HTTPTests {
     }
 
     func testHeaderLimitCannotBeBypassedWithPartialUpload() {
-        XCTAssertThrowsError(try HTTPParser.parse(Data(repeating: 65,count: HTTPParser.maximumHeader+1)))
+        XCTAssertThrowsError(try HTTPParser.parse(Data(repeating: 65, count: HTTPParser.maximumHeader+1)))
     }
 
     func testInvalidAndNegativeLengthsRejected() {
-        for length in ["-1","wat","1.5","+1",""] {
+        for length in ["-1", "wat", "1.5", "+1", ""] {
             let raw="POST /v1/run HTTP/1.1\r\nContent-Length: \(length)\r\n\r\n"
             XCTAssertThrowsError(try HTTPParser.parse(Data(raw.utf8)))
         }
@@ -43,6 +43,6 @@ final class HTTPTests {
 
     func testAuthorizationHeaderIsCaseInsensitiveButValueIsPreserved() throws {
         let raw="GET /v1/status HTTP/1.1\r\nAUTHORIZATION: Bearer AbCdEf\r\n\r\n"
-        XCTAssertEqual(try HTTPParser.parse(Data(raw.utf8))?.headers["authorization"],"Bearer AbCdEf")
+        XCTAssertEqual(try HTTPParser.parse(Data(raw.utf8))?.headers["authorization"], "Bearer AbCdEf")
     }
 }

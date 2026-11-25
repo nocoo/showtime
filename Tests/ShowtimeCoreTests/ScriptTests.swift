@@ -173,7 +173,7 @@ final class ScriptTests {
             XCTAssertEqual(saved.width, 900); XCTAssertEqual(saved.height, 1600); XCTAssertEqual(saved.inset, 40)
             XCTAssertEqual(saved.backdrop, "pearl"); XCTAssertEqual(saved.browserTheme, "dark")
             let encoded = try JSONEncoder().encode(saved)
-            let object = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
             XCTAssertEqual(object["frame"] as? String, replacement.rawValue)
         }
         for device in DeviceFrame.allCases {
@@ -352,21 +352,21 @@ final class ScriptTests {
     }
 
     func testCameraKeepsItsFocusStationary() {
-        let (x,y) = Motion.cameraPoint(x: 620,y: 350,focusX: 620,focusY: 350,scale: 2.6)
-        XCTAssertEqual(x,620);XCTAssertEqual(y,350)
-        let (identityX,identityY) = Motion.cameraPoint(x: 100,y: 200,focusX: 620,focusY: 350,scale: 1)
-        XCTAssertEqual(identityX,100);XCTAssertEqual(identityY,200)
+        let (x, y) = Motion.cameraPoint(x: 620, y: 350, focusX: 620, focusY: 350, scale: 2.6)
+        XCTAssertEqual(x, 620);XCTAssertEqual(y, 350)
+        let (identityX, identityY) = Motion.cameraPoint(x: 100, y: 200, focusX: 620, focusY: 350, scale: 1)
+        XCTAssertEqual(identityX, 100);XCTAssertEqual(identityY, 200)
     }
 
     func testCinematicEasingIsMonotonicAndHasExactEndpoints() {
-        for curve in ["linear","smooth","cinematic"] {
-            XCTAssertEqual(Motion.ease(0,curve:curve),0)
-            XCTAssertEqual(Motion.ease(1,curve:curve),1)
+        for curve in ["linear", "smooth", "cinematic"] {
+            XCTAssertEqual(Motion.ease(0, curve: curve), 0)
+            XCTAssertEqual(Motion.ease(1, curve: curve), 1)
             var previous=0.0
             for i in 0...100 {
-                let value=Motion.ease(Double(i)/100,curve:curve)
-                XCTAssertGreaterThanOrEqual(value,previous)
-                XCTAssertLessThanOrEqual(value,1)
+                let value=Motion.ease(Double(i)/100, curve: curve)
+                XCTAssertGreaterThanOrEqual(value, previous)
+                XCTAssertLessThanOrEqual(value, 1)
                 previous=value
             }
         }

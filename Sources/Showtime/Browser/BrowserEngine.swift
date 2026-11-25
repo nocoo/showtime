@@ -192,7 +192,11 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     static func literal(_ value: String) -> String {
-        String(decoding: try! JSONEncoder().encode(value), as: UTF8.self)
+        guard let data = try? JSONEncoder().encode(value),
+              let text = String(data: data, encoding: .utf8) else {
+            return "\"\""
+        }
+        return text
     }
 
     func target(selector: String?, x: Double?, y: Double?, scroll: Bool = true) async throws -> CGPoint {
@@ -342,8 +346,13 @@ final class BrowserEngine: NSObject, WKNavigationDelegate, WKUIDelegate {
         guard let window = webView.window, let responder = window.firstResponder else { throw ShowtimeError("No focused browser view.") }
         var flags: NSEvent.ModifierFlags = []
         for modifier in modifiers {
-            switch modifier { case "command": flags.insert(.command); case "shift": flags.insert(.shift)
-            case "option": flags.insert(.option); case "control": flags.insert(.control); default: break }
+            switch modifier {
+            case "command": flags.insert(.command)
+            case "shift": flags.insert(.shift)
+            case "option": flags.insert(.option)
+            case "control": flags.insert(.control)
+            default: break
+            }
         }
         let codes: [String: (UInt16, String)] = ["enter": (36, "\r"), "return": (36, "\r"), "tab": (48, "\t"),
             "escape": (53, "\u{1b}"), "backspace": (51, "\u{7f}"), "delete": (117, "\u{f728}"),

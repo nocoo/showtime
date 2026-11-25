@@ -44,8 +44,14 @@ enum SceneCompositor {
     }
 
     // Only immutable images and geometry cross to the recording worker.
-    nonisolated static func drawContent(canvas: CanvasSpec, camera: CameraState, webImage: CGImage,
-                                       backdrop: CGImage, overlayImage: CGImage? = nil, context ctx: CGContext) {
+    nonisolated static func drawContent(
+        canvas: CanvasSpec,
+        camera: CameraState,
+        webImage: CGImage,
+        backdrop: CGImage,
+        overlayImage: CGImage? = nil,
+        context ctx: CGContext
+    ) {
         drawImage(backdrop, in: CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height), context: ctx)
         let layout = canvas.layout
         let screen = layout.canvasScreen, page = layout.canvasPage
@@ -190,8 +196,11 @@ enum SceneCompositor {
         let width = min(maxWidth, max(title ? 540 : 320, max(textSize.width, subSize.width) + 68))
         let height = ceil(textSize.height) + 38 + eyebrowHeight + subHeight
         let y: Double
-        switch caption.position { case "center": y = (canvas.height - height) / 2
-        case "top": y = 126; default: y = canvas.height - height - 49 }
+        switch caption.position {
+        case "center": y = (canvas.height - height) / 2
+        case "top": y = 126
+        default: y = canvas.height - height - 49
+        }
         let box = CGRect(x: (canvas.width - width) / 2, y: y + (1 - entrance) * 18 + (1 - exit) * 8, width: width, height: height)
         context.saveGState(); context.setAlpha(opacity)
         context.setShadow(offset: CGSize(width: 0, height: 8), blur: 24, color: NSColor.black.withAlphaComponent(0.18).cgColor)

@@ -430,7 +430,6 @@ struct InspectorView: View {
         }.disabled(model.isPlaying)
     }
 
-
     private func labeledField(_ label: String, placeholder: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label).font(.system(size: 13, weight: .medium))

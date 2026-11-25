@@ -9,6 +9,7 @@ Run from root with Swift 6 (Xcode or Command Line Tools), Python 3.10+, and Node
 
 ```sh
 scripts/test.sh                                                        # S1 + L1 core & static checks
+swiftlint lint --strict Sources Tests                                  # S2 strict SwiftLint check
 python3 scripts/version.py check                                       # S1 version sync check
 swift build --package-path .                                           # S1 Swift build check
 scripts/build.sh debug                                                 # Build debug dist/Showtime.app
@@ -35,8 +36,8 @@ python3 scripts/package_release.py --local-preview                     # B1 loca
 
 Follows `system1-quality`; CI slot definitions and pinned `base-ci` actions live in `.github/workflows/quality-slots.yml` via `.github/workflows/ci.yml` (`quality / Z1: Gate` aggregates slots and verifies `tested-sha`). Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
 
-- **Enforced in CI**: `S1`, `S3`, `G1`, `G2` (`examples/overlay-react/bun.lock`), `B1`, `L1` (`ShowtimeChecks` + script/guide checks), `Z1`. Checks are check-only; past runs do not prove a current pass.
-- **Exceptions / gaps**: `S2` (`N/A`, no lint gate); `L2` (`N/A`, not a Worker); `L3`/`L4` (`manual`, unlocked GUI/desktop); `P1` (`N/A`, not published to npm).
+- **Enforced in CI**: `S1`, `S2` (`.swiftlint.yml` + `swiftlint lint --strict Sources Tests`), `S3`, `G1`, `G2` (`examples/overlay-react/bun.lock`), `B1`, `L1` (`ShowtimeChecks` + script/guide checks), `Z1`. Checks are check-only; past runs do not prove a current pass.
+- **Exceptions / gaps**: `L2` (`N/A`, not a Worker); `L3`/`L4` (`manual`, unlocked GUI/desktop); `P1` (`N/A`, not published to npm).
 - **Local hooks**: none installed yet (`planned`); run `scripts/test.sh` locally before committing.
 
 ## Resources & Isolation
