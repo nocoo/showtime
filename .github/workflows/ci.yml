@@ -1,5 +1,5 @@
 # CI slot standard v1.3.0 (system1-quality): impl S1, S3, G1, G2, B1, L1, Z1 via quality-slots.yml;
-# na S2, L2, L3, L4, P1 skipped in slot jobs. nocoo/base-ci v2026.15 actions pin; native macOS commands inlined.
+# na S2, L2, L3, L4, P1 skipped in slot jobs. nocoo/base-ci v2026.16 actions pin; native macOS commands inlined.
 name: macOS build
 
 on:
