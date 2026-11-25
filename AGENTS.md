@@ -17,7 +17,7 @@ scripts/showtime --version                                             # CLI ver
 python3 scripts/test_integration.py --output-dir artifacts/input-check # L3 manual (unlocked GUI)
 python3 scripts/test_workflow.py --output-dir artifacts/workflow-check # L4 manual (unlocked GUI + FFmpeg)
 SHOWTIME_ARCH=universal scripts/build.sh release                       # B1 universal release build
-python3 scripts/package_release.py --local-preview                     # B1 local preview archive check
+python3 scripts/package_release.py --local-preview                     # P1 local preview archive check
 ```
 
 ## Invariants
@@ -36,8 +36,8 @@ python3 scripts/package_release.py --local-preview                     # B1 loca
 
 Follows `system1-quality`; CI slot definitions and pinned `base-ci` actions live in `.github/workflows/quality-slots.yml` via `.github/workflows/ci.yml` (`quality / Z1: Gate` aggregates slots and verifies `tested-sha`). Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
 
-- **Enforced in CI**: `S1`, `S2` (`.swiftlint.yml` + `swiftlint lint --strict Sources Tests`), `S3`, `G1`, `G2` (`examples/overlay-react/bun.lock`), `B1`, `L1` (`ShowtimeChecks` + script/guide checks), `Z1`. Checks are check-only; past runs do not prove a current pass.
-- **Exceptions / gaps**: `L2` (`N/A`, not a Worker); `L3`/`L4` (`manual`, unlocked GUI/desktop); `P1` (`N/A`, not published to npm).
+- **Enforced in CI**: `S1`, `S2` (`.swiftlint.yml` + `swiftlint lint --strict Sources Tests`), `S3`, `G1`, `G2` (`examples/overlay-react/bun.lock`), `B1` (`scripts/build.sh release`), `L1` (`ShowtimeChecks` + script/guide checks), `P1` (`package_release.py --local-preview` on `B1` artifact), `Z1`. Checks are check-only; past runs do not prove a current pass.
+- **Exceptions / gaps**: `L2` (`N/A`, not a Worker); `L3`/`L4` (`manual`, unlocked GUI/desktop).
 - **Local hooks**: none installed yet (`planned`); run `scripts/test.sh` locally before committing.
 
 ## Resources & Isolation

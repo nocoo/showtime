@@ -148,12 +148,17 @@ jobs:
         uses: nocoo/base-ci/.github/actions/configure-env@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
-      - name: B1 release build and local preview package
+      - name: B1 release build
         shell: bash
         run: |
           set -euo pipefail
           scripts/build.sh release
-          python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview
+          tar -cf dist/showtime-app.tar -C dist Showtime.app
+      - name: Upload B1 build artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: showtime-app
+          path: dist/showtime-app.tar
       - name: Record SHA
         id: record-sha
         if: always()
@@ -161,7 +166,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   l1-unit-tests:
-    name: "L1: Unit Tests & Coverage"
+    name: "L1: Unit"
     runs-on: macos-26
     timeout-minutes: 20
     outputs:
@@ -207,12 +212,35 @@ jobs:
     steps:
       - run: echo "na — native/media acceptance runs manually on unlocked desktop"
 
-  p1-package-check:
-    name: "P1: Package Check"
-    if: ${{ vars.ENABLE_P1 == 'true' }}
-    runs-on: ubuntu-latest
+  p1-package:
+    name: "P1: Package"
+    needs:
+      - b1-build
+    runs-on: macos-26
+    timeout-minutes: 15
+    outputs:
+      tested-sha: ${{ steps.record-sha.outputs.sha }}
     steps:
-      - run: echo "na — native app/SwiftPM package, not published to npm"
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download B1 build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: showtime-app
+          path: dist
+      - name: Package local preview archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xf dist/showtime-app.tar -C dist
+          python3 scripts/package_release.py --local-preview --output-dir dist/ci-preview
+      - name: Record SHA
+        id: record-sha
+        if: always()
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   z1-gate:
     name: "Z1: Gate"
@@ -227,7 +255,7 @@ jobs:
       - l2-runtime
       - l3-integration
       - l4-e2e
-      - p1-package-check
+      - p1-package
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -242,6 +270,7 @@ jobs:
           G2_SHA: ${{ needs.g2-dependency-vulnerabilities.outputs.tested-sha }}
           L1_SHA: ${{ needs.l1-unit-tests.outputs.tested-sha }}
           B1_SHA: ${{ needs.b1-build.outputs.tested-sha }}
+          P1_SHA: ${{ needs.p1-package.outputs.tested-sha }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -257,12 +286,12 @@ jobs:
               "g2-dependency-vulnerabilities",
               "b1-build",
               "l1-unit-tests",
+              "p1-package",
           ]
           na = [
               "l2-runtime",
               "l3-integration",
               "l4-e2e",
-              "p1-package-check",
           ]
           bad_impl = [job for job in impl if needs[job]["result"] != "success"]
           bad_na = [job for job in na if needs[job]["result"] != "skipped"]
@@ -273,7 +302,7 @@ jobs:
               print("NA slot jobs must be skipped:", ", ".join(bad_na))
               sys.exit(1)
           PY
-          for label in S1_SHA S2_SHA S3_SHA G1_SHA G2_SHA L1_SHA B1_SHA; do
+          for label in S1_SHA S2_SHA S3_SHA G1_SHA G2_SHA L1_SHA B1_SHA P1_SHA; do
             value="${!label}"
             test -n "$value"
             test "$value" = "$EXPECTED_SHA"
