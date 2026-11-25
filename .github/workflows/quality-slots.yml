@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   s1-typecheck:
-    name: "S1: Typecheck"
+    name: "S1: Types"
     runs-on: macos-26
     timeout-minutes: 20
     outputs:
@@ -77,7 +77,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   s3-workflow-lint:
-    name: "S3: Workflow Lint"
+    name: "S3: Workflow"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -87,47 +87,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install verified actionlint
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location --retry 3 \
-            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
-            -o "$RUNNER_TEMP/actionlint.tar.gz"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
-      - name: Validate workflow syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          "${RUNNER_TEMP}/actionlint"
-      - name: Check immutable shared workflow references
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m pip install --quiet pyyaml
-          python3 - <<'PY'
-          import pathlib, re, yaml
-          files = list(pathlib.Path(".github/workflows").glob("*.y*ml"))
-          references = []
-          for path in files:
-              data = yaml.safe_load(path.read_text())
-              for job in data.get("jobs", {}).values():
-                  references.extend(item["uses"] for item in [job, *job.get("steps", [])] if "uses" in item)
-          for ref in references:
-              if ref.startswith("nocoo/base-ci/") and not re.fullmatch(r"nocoo/base-ci/[^@]+@[a-f0-9]{40}", ref):
-                  raise SystemExit(f"Shared CI reference must use a full commit SHA: {ref}")
-          required = ".github/workflows/quality-slots.yml"
-          if not any(required in ref for ref in references):
-              raise SystemExit(f"Missing required reusable workflow: {required}")
-          print(f"Validated {len(files)} workflow files and immutable base-ci references")
-          PY
-      - name: Check YAML style
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m pip install --quiet 'yamllint==1.38.0'
-          yamllint -d '{extends: default, rules: {line-length: disable, document-start: disable, truthy: disable}}' .github/workflows/*.yml
+      - uses: nocoo/base-ci/.github/actions/lint-workflows@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
+        with:
+          required-reusable-workflow: ".github/workflows/quality-slots.yml"
       - name: Record SHA
         id: record-sha
         if: always()
@@ -135,7 +97,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   g1-secret-scan:
-    name: "G1: Secret Scan"
+    name: "G1: Secrets"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -145,11 +107,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install security scanners (gitleaks + osv-scanner)
-        uses: nocoo/base-ci/.github/actions/setup-security-scanners@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
-      - name: G1 gitleaks detect
-        shell: bash
-        run: gitleaks detect --no-banner --verbose --redact --no-git
+          fetch-depth: 1
+      - uses: nocoo/base-ci/.github/actions/scan-secrets@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
       - name: Record SHA
         id: record-sha
         if: always()
@@ -157,7 +116,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   g2-dependency-vulnerabilities:
-    name: "G2: Dependency Vulnerabilities"
+    name: "G2: Dependencies"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -167,11 +126,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install security scanners (gitleaks + osv-scanner)
-        uses: nocoo/base-ci/.github/actions/setup-security-scanners@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
-      - name: G2 OSV lockfile scan
-        shell: bash
-        run: osv-scanner scan --lockfile=examples/overlay-react/bun.lock
+      - uses: nocoo/base-ci/.github/actions/scan-dependencies@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
+        with:
+          lockfiles: "examples/overlay-react/bun.lock"
       - name: Record SHA
         id: record-sha
         if: always()
@@ -190,7 +147,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Configure test environment
-        uses: nocoo/base-ci/.github/actions/configure-env@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/configure-env@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
       - name: B1 release build and local preview package
