@@ -147,7 +147,7 @@ jobs:
       - name: Configure test environment
         uses: nocoo/base-ci/.github/actions/configure-env@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
         with:
-          env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
+          env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "arm64"}'
       - name: B1 release build
         shell: bash
         run: |
