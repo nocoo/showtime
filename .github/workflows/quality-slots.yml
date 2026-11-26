@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.local/share/swiftlint
           key: ${{ runner.os }}-swiftlint-0.65.1
@@ -87,7 +87,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: nocoo/base-ci/.github/actions/lint-workflows@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
+      - uses: nocoo/base-ci/.github/actions/lint-workflows@bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c # v2026.18
       - name: Record SHA
         id: record-sha
         if: always()
@@ -106,7 +106,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
-      - uses: nocoo/base-ci/.github/actions/scan-secrets@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
+      - uses: nocoo/base-ci/.github/actions/scan-secrets@bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c # v2026.18
       - name: Record SHA
         id: record-sha
         if: always()
@@ -124,7 +124,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: nocoo/base-ci/.github/actions/scan-dependencies@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
+      - uses: nocoo/base-ci/.github/actions/scan-dependencies@bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c # v2026.18
         with:
           lockfiles: "examples/overlay-react/bun.lock"
       - name: Record SHA
@@ -145,7 +145,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Configure test environment
-        uses: nocoo/base-ci/.github/actions/configure-env@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
+        uses: nocoo/base-ci/.github/actions/configure-env@bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c # v2026.18
         with:
           env-json: '{"CODE_SIGN_IDENTITY": "-", "SHOWTIME_ARCH": "universal"}'
       - name: B1 release build
@@ -259,52 +259,24 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      tested-sha: ${{ steps.gate.outputs.tested-sha }}
     steps:
-      - name: Z1 aggregate slot jobs
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-          S1_SHA: ${{ needs.s1-typecheck.outputs.tested-sha }}
-          S2_SHA: ${{ needs.s2-lint.outputs.tested-sha }}
-          S3_SHA: ${{ needs.s3-workflow-lint.outputs.tested-sha }}
-          G1_SHA: ${{ needs.g1-secret-scan.outputs.tested-sha }}
-          G2_SHA: ${{ needs.g2-dependency-vulnerabilities.outputs.tested-sha }}
-          L1_SHA: ${{ needs.l1-unit-tests.outputs.tested-sha }}
-          B1_SHA: ${{ needs.b1-build.outputs.tested-sha }}
-          P1_SHA: ${{ needs.p1-package.outputs.tested-sha }}
-          EXPECTED_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json, os, sys
-
-          needs = json.loads(os.environ["NEEDS_JSON"])
-          impl = [
-              "s1-typecheck",
-              "s2-lint",
-              "s3-workflow-lint",
-              "g1-secret-scan",
-              "g2-dependency-vulnerabilities",
-              "b1-build",
-              "l1-unit-tests",
-              "p1-package",
-          ]
-          na = [
-              "l2-runtime",
-              "l3-integration",
-              "l4-e2e",
-          ]
-          bad_impl = [job for job in impl if needs[job]["result"] != "success"]
-          bad_na = [job for job in na if needs[job]["result"] != "skipped"]
-          if bad_impl:
-              print("Implemented slot jobs not successful:", ", ".join(bad_impl))
-              sys.exit(1)
-          if bad_na:
-              print("NA slot jobs must be skipped:", ", ".join(bad_na))
-              sys.exit(1)
-          PY
-          for label in S1_SHA S2_SHA S3_SHA G1_SHA G2_SHA L1_SHA B1_SHA P1_SHA; do
-            value="${!label}"
-            test -n "$value"
-            test "$value" = "$EXPECTED_SHA"
-          done
-          echo "Verified CI source ${EXPECTED_SHA}"
+      - id: gate
+        uses: nocoo/base-ci/.github/actions/z1-gate@bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c # v2026.18
+        with:
+          needs-json: ${{ toJSON(needs) }}
+          expected-sha: ${{ github.sha }}
+          required-jobs: |
+            s1-typecheck=S1: Types
+            s2-lint=S2: Lint
+            s3-workflow-lint=S3: Workflow
+            g1-secret-scan=G1: Secrets
+            g2-dependency-vulnerabilities=G2: Dependencies
+            b1-build=B1: Build
+            l1-unit-tests=L1: Unit
+            p1-package=P1: Package
+          skipped-jobs: |
+            l2-runtime=L2: Runtime
+            l3-integration=L3: Integration
+            l4-e2e=L4: E2E
