@@ -34,7 +34,7 @@ python3 scripts/package_release.py --local-preview                     # P1 loca
 
 ## Quality & Local Gates
 
-Follows `system1-quality`; CI slot definitions and pinned `base-ci` actions live in `.github/workflows/quality-slots.yml` via `.github/workflows/ci.yml` (`quality / Z1: Gate` aggregates slots and verifies `tested-sha`). Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
+Follows `system1-quality`; CI slot definitions and pinned `base-ci` (`v2026.24`) actions live in `.github/workflows/quality-slots.yml` via `.github/workflows/pipeline.yml` (`quality / Z1: Gate` aggregates slots and verifies `tested-sha`), with no automated CD workflow (manual local signed/notarized release only). Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
 
 - **Enforced in CI**: `S1`, `S2` (`.swiftlint.yml` + `swiftlint lint --strict Sources Tests`), `S3`, `G1`, `G2` (`examples/overlay-react/bun.lock`), `B1` (`scripts/build.sh release`), `L1` (`ShowtimeChecks` + script/guide checks), `P1` (`package_release.py --local-preview` on `B1` artifact), `Z1`. Checks are check-only; past runs do not prove a current pass.
 - **Exceptions / gaps**: `L2` (`N/A`, not a Worker); `L3`/`L4` (`manual`, unlocked GUI/desktop).

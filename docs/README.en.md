@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/macOS-14%2B-222222?logo=apple&logoColor=white" alt="macOS 14+" />
   <img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6" />
   <img src="https://img.shields.io/badge/SwiftUI-007AFF?logo=swift&logoColor=white" alt="SwiftUI" />
-  <a href="https://github.com/nocoo/showtime/actions/workflows/ci.yml"><img src="https://github.com/nocoo/showtime/actions/workflows/ci.yml/badge.svg" alt="macOS build" /></a>
+  <a href="https://github.com/nocoo/showtime/actions/workflows/pipeline.yml"><img src="https://github.com/nocoo/showtime/actions/workflows/pipeline.yml/badge.svg" alt="Pipeline" /></a>
   <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4A8234" alt="MIT License" /></a>
 </p>
 
